@@ -406,7 +406,7 @@ var (
 	fileExt = map[string]bool{
 		"md": true, "go": true, "json": true, "yaml": true, "yml": true, "sh": true, "mod": true, "sum": true,
 		"txt": true, "py": true, "ts": true, "js": true, "toml": true, "xml": true, "html": true, "css": true,
-		"proto": true, "sig": true, "tar": true, "gz": true, "zip": true, "log": true, "out": true, "exe": true,
+		"proto": true, "sig": true, "tar": true, "gz": true, "zip": true, "log": true, "out": true, "exe": true, "png": true, "gif": true, "svg": true,
 		"cfg": true, "ini": true, "env": true, "lock": true, "bin": true,
 	}
 )
