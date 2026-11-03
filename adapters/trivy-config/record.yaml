@@ -1,0 +1,12 @@
+schema: tool-invocation/v1
+id: trivy-config
+ecosystem: any
+version: "0.76.1"
+pin: {asset: trivy, sha256: d1dfca6ae10a1ad4540bb94e64f0510077c47008920a9b554986b39dca573d83}
+licence_class: osi
+command: [trivy, config, --skip-check-update, --format, sarif, --output, "{{output_path}}", --exit-code, "2", "{{repo_root}}"]
+inputs: ["."]
+egress: none
+exit_map: {0: clean, 2: findings, default: tool-error}
+output: {format: sarif-2.1.0, path: report.sarif}
+fixture: {repo: dockerfile-misconfigured, expect: findings}
