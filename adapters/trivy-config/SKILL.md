@@ -30,8 +30,8 @@ The exit map is `{0: clean, 3: findings, default: tool-error}`: exit 0 means cle
 ## What to do with a delta
 
 - Fix: remove the misconfiguration from the configuration file.
-- Waive: accept a finding for a limited time in `.saphan-waivers.yaml`, naming the rule (`ruleId`) and one of the result's fingerprints, with an `expires` date; an expired waiver is reported and never silently applied. The scanned repository's own `trivy.yaml` and `.trivyignore` are not read, so neither file can waive or silence anything.
-- Escalate: a finding on a configuration you did not expect to change, a result you cannot reproduce, or output that does not parse as SARIF 2.1.0 — raise it before merging.
+- Waive: trivy writes no fingerprint into its SARIF report, so its findings cannot be waived through `.saphan-waivers.yaml` today — the waiver file requires all four fields, `fingerprint` included, and a waiver applies only to a finding one of whose fingerprints equals `fingerprint`. Until the runner derives a fingerprint for tools that write none, a trivy finding is fixed or escalated, never waived. Do not invent a fingerprint, and do not use the scanned repository's own `trivy.yaml` or `.trivyignore`, which the record switches off.
+- Escalate: a finding on a configuration you did not expect to change, a result you cannot reproduce, output that does not parse as SARIF 2.1.0, or a finding that is a true false positive — raise it before merging. A true false positive goes to a human, because it cannot be waived yet.
 
 Noise on a typical repository: rules for files that do not exist there — for example Kubernetes checks when there are no Kubernetes manifests — simply never fire; they are quiet, not a clean result. On `dockerfile-misconfigured` trivy reports the root user (`DS-0002`) and the missing HEALTHCHECK (`DS-0026`); it does not report the remote-URL `ADD`, although the fixture's README claims every scanner flags it. That gap is the master's measurement, not a defect of this record; do not edit the fixture to force a missing rule, report the gap instead.
 
