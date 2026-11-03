@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 const (
@@ -61,8 +62,10 @@ func fakeTool(mode, arg string) int {
 		}
 		os.WriteFile("report.xml", []byte(fakeJUnit), 0o644)
 	case "sleep":
-		var wait chan struct{}
-		<-wait
+		// A sleeping timer, not a receive on a nil channel: with no other goroutine the
+		// runtime's deadlock detector kills a nil-channel receive at once (exit 2) on some
+		// platforms, so the tool "finishes" before the timeout this case exists to prove.
+		time.Sleep(time.Hour)
 	}
 	return 1
 }
