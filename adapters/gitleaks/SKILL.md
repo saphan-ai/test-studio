@@ -46,6 +46,8 @@ SARIF 2.1.0: a document whose `version` is exactly `2.1.0` with a non-empty `run
 - `locations` — the file and region where the secret appears;
 - `partialFingerprints` / `fingerprints` — the finding's identity, the value `.saphan-waivers.yaml` matches on.
 
+The report carries the rule id, the file and the line of each match — never the secret's value. To see the value, the reader opens the file at the reported line. `--redact` is on the invocation so no secret value reaches the report the fleet stores as evidence.
+
 Noise on a typical repository: strings that look like keys but are test fixtures, example values or public constants (for example the fixture's `TSFIXTURE-SYNTHETIC-…` token), and anything already rotated. A finding is noise only after a human decides it; the default decision is that a finding is real.
 
 ## What to do with a delta
