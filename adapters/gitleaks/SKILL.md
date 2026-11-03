@@ -35,7 +35,7 @@ Do not use it for:
 
 Only through `saphan ask tool gitleaks`, which prints the pinned invocation (the argv from adapters/gitleaks/record.yaml: the program, the flag for the config file, the SARIF report format, the report path report.sarif and the repository root). NEVER a copied command line. Until `saphan ask tool` exists, that line stands as written and nothing replaces it. Do not type the invocation by hand: flags drift between releases, and the record is what the gate checks.
 
-The scan reads `.gitleaks.toml` at the repository root (the record's `config`) and writes `report.sarif`. egress: none — nothing leaves the machine.
+The scan reads `.gitleaks.toml` at the repository root (the record's `config`) and writes `report.sarif`. It runs with `--ignore-gitleaks-allow`, so inline `gitleaks:allow` comments in the scanned code do not silence the scan. egress: none — nothing leaves the machine.
 
 ## What its output means
 
@@ -46,16 +46,24 @@ SARIF 2.1.0: a document whose `version` is exactly `2.1.0` with a non-empty `run
 - `locations` — the file and region where the secret appears;
 - `partialFingerprints` / `fingerprints` — the finding's identity, the value `.saphan-waivers.yaml` matches on.
 
-The report carries the rule id, the file and the line of each match — never the secret's value. To see the value, the reader opens the file at the reported line. `--redact` is on the invocation so no secret value reaches the report the fleet stores as evidence.
+The report carries the rule id, the file and the line of each match — never the secret's value. An agent works from rule id, file, line and fingerprint only. It never opens, prints or copies the matched value; looking at the value is a human's job. `--redact` is on the invocation so no secret value reaches the report the fleet stores as evidence.
 
 Noise on a typical repository: strings that look like keys but are test fixtures, example values or public constants (for example the fixture's `TSFIXTURE-SYNTHETIC-…` token), and anything already rotated. A finding is noise only after a human decides it; the default decision is that a finding is real.
+
+## What its exit codes mean
+
+The record maps exit code 0 to `clean`, exit code 3 to `findings`, and anything else to `tool-error`. A crash of the scanner is therefore a broken run: it is reported as `tool-error`, never read as clean and never read as findings. `tool-error` means the record or the binary is broken, not the repository.
 
 ## What to do with a delta
 
 A run whose exit code maps to `findings`:
 
-1. fix — remove the secret, rotate it, and re-scan;
-2. waive — add an entry to `.saphan-waivers.yaml` with `rule`, `fingerprint`, `reason` and an `expiry` date; an expired waiver is reported and never silently applied;
+1. fix — a REAL secret is rotated first: revoke it at its issuer, and only then remove it from the files. Removing it from the files does not remove it from history, so the history question goes to a human.
+2. waive — a waiver is for a false positive or a test fixture only; it is never an equal choice to fixing a live secret. Add an entry to `.saphan-waivers.yaml` with `rule`, `fingerprint`, `reason` and an `expires` date (the spec's key); an expired waiver is reported and never silently applied.
 3. escalate — if the secret might be real, treat it as compromised: rotate it and tell the security contact; never log or commit the value.
 
 A run mapping to `clean` needs no action; `tool-error` means the record or the binary is broken, not the repository.
+
+## Repository policy files
+
+A change that adds or edits `.gitleaks.toml` or `.gitleaksignore` is itself escalated to a human, never accepted by an agent — the repository's own scanner policy stays as the customer wrote it (the gate's fixture depends on it). A waiver goes through `.saphan-waivers.yaml`, which carries `expires`; an inline `gitleaks:allow` comment carries no such date and does not silence the scan.
