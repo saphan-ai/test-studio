@@ -439,8 +439,8 @@ check in the form `(<letter>) <STATUS>: <text>`:
 | check | what it does |
 |---|---|
 | (a) | the record validates against the schema (its sha256 is printed), plus the runner's own rules |
-| (b) | an `asset` pin's sha256 is compared with `--asset`. A PASS is what lets (c) run that file; a FAIL stops the run before (c). An `image` pin is `NOT APPLICABLE`. An asset pin with no `--asset` is `UNMEASURED` |
-| (c) | when (b) PASSED on an `asset` pin, (c) executes the `--asset` file by its absolute path, passes `command[1:]` unchanged, and the (c) line names that path. Without `--asset`, the argv runs as before (its first element resolved through `PATH`) and the (c) line ends with a remark that the run says nothing about the pinned bytes. An `image` pin is unchanged |
+| (b) | an `asset` pin's sha256 is compared with a private copy of `--asset`. A PASS is what lets (c) run that copy; a FAIL stops the run before (c). The (b) line names the file that was given. An `image` pin is `NOT APPLICABLE`. An asset pin with no `--asset` is `UNMEASURED` |
+| (c) | when (b) PASSED on an `asset` pin, (c) executes that private copy by its absolute path, and the (c) line names the copy and says it is a private copy of the file (b) hashed. `command[0]` is dropped and not compared with `pin.asset`; the program that runs is the private copy of `--asset`. `command[1:]` is passed unchanged. Without `--asset`, the argv runs as before (its first element resolved through `PATH`) and the (c) line ends with a remark that the run says nothing about the pinned bytes. An `image` pin is unchanged |
 | (d) | the exit code maps through `exit_map` and must equal `fixture.expect` |
 | (e) | the output file exists and is checked by its format, as above |
 | (f) | the last line, printed on every path including the exit-2 ones, says egress was not observed |

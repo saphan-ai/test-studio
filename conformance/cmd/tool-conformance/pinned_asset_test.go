@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,7 +62,7 @@ func assetRecord(t *testing.T, sum string) map[string]any {
 
 // TestAssetPinRunsThePinnedFileNotThePathBinary is the defect: (b) hashes --asset, and (c)
 // must execute that same file. A program named like the pin's asset sits earlier on PATH and
-// exits 9; a pass means (c) ran the pinned file (exit 1, and the (c) line names its path).
+// exits 9; a pass means (c) ran the pinned bytes (exit 1) from a private copy, not this path.
 func TestAssetPinRunsThePinnedFileNotThePathBinary(t *testing.T) {
 	sentinel := filepath.Join(t.TempDir(), "path-ran")
 	pathDecoy(t, sentinel)
@@ -75,12 +77,12 @@ func TestAssetPinRunsThePinnedFileNotThePathBinary(t *testing.T) {
 	if !strings.HasPrefix(b, "(b) PASS:") {
 		t.Fatalf("check (b) is %q, want PASS on the --asset file\n%s", b, out)
 	}
-	if _, err := os.Stat(sentinel); err == nil || code != 0 || !strings.Contains(c, "exited with code 1") || !strings.Contains(c, abs) {
+	if _, err := os.Stat(sentinel); err == nil || code != 0 || !strings.Contains(c, "exited with code 1") || !strings.Contains(c, "a private copy of the file (b) hashed") || strings.Contains(c, "; ran "+abs+",") {
 		ran := "absent"
 		if _, err := os.Stat(sentinel); err == nil {
 			ran = "present"
 		}
-		t.Fatalf("exit %d, check (c) %q, PATH sentinel %s; want exit 0, (c) naming %s and code 1, sentinel absent\n%s", code, c, ran, abs, out)
+		t.Fatalf("exit %d, check (c) %q, PATH sentinel %s; want exit 0, (c) naming a private copy and code 1, not %s, sentinel absent\n%s", code, c, ran, abs, out)
 	}
 	t.Logf("exit %d\n%s\n%s", code, b, c)
 }
@@ -158,5 +160,112 @@ func TestImagePinDoesNotRunTheAssetFile(t *testing.T) {
 	}
 	if strings.Contains(statusLine(out, "c"), abs) {
 		t.Fatalf("check (c) names the --asset file on an image pin\n%s", out)
+	}
+}
+
+// TestReplacingTheAssetAfterTheHashDoesNotChangeTheRun is the window between the
+// digest and the exec. The hook replaces the original --asset with a different
+// program after (b) has passed. The run must still execute the bytes that were hashed.
+func TestReplacingTheAssetAfterTheHashDoesNotChangeTheRun(t *testing.T) {
+	sentinel := filepath.Join(t.TempDir(), "swapped-ran")
+	if strings.Contains(sentinel, "'") {
+		t.Fatalf("sentinel path %q contains a single quote", sentinel)
+	}
+	asset, sum := pinnedAsset(t)
+	var copyPath, copySum string
+	var copyMode, dirMode os.FileMode
+	var staged bool
+	t.Cleanup(func() { betweenPinAndRun = nil })
+	betweenPinAndRun = func(given string) {
+		if lastStagedAsset != "" {
+			staged = true
+			copyPath = lastStagedAsset
+			info, err := os.Stat(copyPath)
+			if err != nil {
+				t.Errorf("stat private copy: %v", err)
+			} else {
+				copyMode = info.Mode().Perm()
+			}
+			dinfo, err := os.Stat(filepath.Dir(copyPath))
+			if err != nil {
+				t.Errorf("stat private directory: %v", err)
+			} else {
+				dirMode = dinfo.Mode().Perm()
+			}
+			copySum, err = fileSHA256(copyPath)
+			if err != nil {
+				t.Errorf("hash private copy: %v", err)
+			}
+		}
+		writeScript(t, given, "#!/bin/sh\necho ran > '"+sentinel+"'\nexit 9\n")
+	}
+	code, out := runRecord(t, assetRecord(t, sum), "--asset", asset)
+	c := statusLine(out, "c")
+	_, serr := os.Stat(sentinel)
+	if serr == nil || code != 0 || !strings.Contains(c, "exited with code 1") || !strings.Contains(c, "a private copy of the file (b) hashed") {
+		present := serr == nil
+		t.Fatalf("replaced --asset changed the run: exit %d, (c) %q, sentinel present=%v; want exit 0, code 1, private copy, sentinel absent\n%s", code, c, present, out)
+	}
+	if !staged || copyMode != 0o500 || dirMode != 0o700 || copySum != sum {
+		t.Fatalf("private copy: staged=%v mode=%#o dir=%#o sum=%s want=%s path=%s", staged, copyMode, dirMode, copySum, sum, copyPath)
+	}
+	if _, err := os.Stat(copyPath); !os.IsNotExist(err) {
+		t.Fatalf("private copy %s still present after the run: %v", copyPath, err)
+	}
+	if _, err := os.Stat(filepath.Dir(copyPath)); !os.IsNotExist(err) {
+		t.Fatalf("private directory %s still present after the run: %v", filepath.Dir(copyPath), err)
+	}
+	replaced, err := fileSHA256(asset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replaced == sum {
+		t.Fatal("the original --asset was not replaced, so the hook did not run")
+	}
+	if strings.Contains(c, "; ran "+asset+",") {
+		t.Fatalf("(c) names the original path %s\n%s", asset, c)
+	}
+}
+
+// TestRelativeAssetRunsTheHashedFileNotAPathNamesake: a bare relative --asset,
+// with a PATH program of that same name, still runs the hashed file.
+// The pinned asset exits 1, so the (c) line says "exited with code 1".
+func TestRelativeAssetRunsTheHashedFileNotAPathNamesake(t *testing.T) {
+	sentinel := filepath.Join(t.TempDir(), "path-ran")
+	if strings.Contains(sentinel, "'") {
+		t.Fatalf("sentinel path %q contains a single quote", sentinel)
+	}
+	asset, sum := pinnedAsset(t)
+	// command[0] is fake-tool. The relative --asset is the file's base name, and that
+	// is the name a bare argv[0] is looked up under. Both names can steal the run.
+	pathDecoy(t, sentinel)
+	decoyDir := t.TempDir()
+	writeScript(t, filepath.Join(decoyDir, filepath.Base(asset)), "#!/bin/sh\necho ran > '"+sentinel+"'\nexit 9\n")
+	t.Setenv("PATH", decoyDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	recPath := filepath.Join(t.TempDir(), "rec.json")
+	body, err := json.Marshal(assetRecord(t, sum))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(recPath, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fx, err := filepath.Abs(fixturesRootPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := filepath.Abs(recordSchemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Dir(asset))
+	var buf bytes.Buffer
+	code := run([]string{"--record", recPath, "--fixtures-root", fx, "--record-schema", sc, "--asset", filepath.Base(asset)}, &buf)
+	out := buf.String()
+	c := statusLine(out, "c")
+	_, serr := os.Stat(sentinel)
+	if serr == nil || code != 0 || !strings.Contains(c, "exited with code 1") {
+		t.Fatalf("relative --asset: exit %d, (c) %q, sentinel present=%v\n%s", code, c, serr == nil, out)
 	}
 }
