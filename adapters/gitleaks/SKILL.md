@@ -52,7 +52,7 @@ Noise on a typical repository: strings that look like keys but are test fixtures
 
 ## What its exit codes mean
 
-The record maps exit code 0 to `clean`, exit code 3 to `findings`, and anything else to `tool-error`. A crash of the scanner is therefore a broken run: it is reported as `tool-error`, never read as clean and never read as findings. `tool-error` means the record or the binary is broken, not the repository.
+The record maps exit code 0 to `clean`, exit code 3 to `findings`, and anything else to `tool-error`. A crash of the scanner is therefore a broken run: it is reported as `tool-error`, never read as clean and never read as findings. `tool-error` means the record, the binary, or the scanned repository's own `.gitleaks.toml` (a malformed config) is broken.
 
 ## What to do with a delta
 
@@ -62,8 +62,8 @@ A run whose exit code maps to `findings`:
 2. waive — a waiver is for a false positive or a test fixture only; it is never an equal choice to fixing a live secret. Add an entry to `.saphan-waivers.yaml` with `rule`, `fingerprint`, `reason` and an `expires` date (the spec's key); an expired waiver is reported and never silently applied.
 3. escalate — if the secret might be real, treat it as compromised: rotate it and tell the security contact; never log or commit the value.
 
-A run mapping to `clean` needs no action; `tool-error` means the record or the binary is broken, not the repository.
+A run mapping to `clean` needs no action; `tool-error` means the record, the binary, or the scanned repository's own `.gitleaks.toml` (a malformed config) is broken.
 
 ## Repository policy files
 
-A change that adds or edits `.gitleaks.toml` or `.gitleaksignore` is itself escalated to a human, never accepted by an agent — the repository's own scanner policy stays as the customer wrote it (the gate's fixture depends on it). A waiver goes through `.saphan-waivers.yaml`, which carries `expires`; an inline `gitleaks:allow` comment carries no such date and does not silence the scan.
+A change that adds or edits `.gitleaks.toml` or `.gitleaksignore` is itself escalated to a human, never accepted by an agent — the repository's own scanner policy stays as the customer wrote it (the gate's fixture depends on it). A waiver goes through `.saphan-waivers.yaml`, which carries `expires`; an inline `gitleaks:allow` comment carries no such date and does not silence the scan. The repository's `.gitleaksignore` and any allowlist in its `.gitleaks.toml` still silence findings; that is why a change that adds or edits either file is escalated to a human.
