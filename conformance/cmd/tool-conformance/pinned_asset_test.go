@@ -17,6 +17,23 @@ func writeScript(t *testing.T, path, body string) {
 	}
 }
 
+// digestPrintedByCheckB is the sha256 check (b) printed on PASS.
+func digestPrintedByCheckB(t *testing.T, out string) string {
+	t.Helper()
+	b := statusLine(out, "b")
+	const mark = "pin.sha256 "
+	i := strings.Index(b, mark)
+	if i < 0 {
+		t.Fatalf("check (b) does not print the digest: %q", b)
+	}
+	rest := b[i+len(mark):]
+	hex, _, ok := strings.Cut(rest, " ")
+	if !ok || len(hex) != 64 {
+		t.Fatalf("check (b) digest is not 64 hex digits: %q", b)
+	}
+	return hex
+}
+
 // assertNoPrivateAssetCopy fails when dir still holds a staging directory.
 // dir is a TMPDIR set for one run. MkdirTemp reads that variable, so a copy
 // the runner did not remove is visible here, and a copy it did remove is not.
@@ -231,8 +248,12 @@ func TestReplacingTheAssetAfterTheHashDoesNotChangeTheRun(t *testing.T) {
 		present := serr == nil
 		t.Fatalf("replaced --asset changed the run: exit %d, (c) %q, sentinel present=%v; want exit 0, code 1, private copy, sentinel absent\n%s", code, c, present, out)
 	}
-	if !staged || copyMode != 0o500 || dirMode != 0o700 || copySum != sum {
+	if !staged || copyMode != 0o500 || dirMode != 0o500 || copySum != sum {
 		t.Fatalf("private copy: staged=%v mode=%#o dir=%#o sum=%s want=%s path=%s", staged, copyMode, dirMode, copySum, sum, copyPath)
+	}
+	printed := digestPrintedByCheckB(t, out)
+	if printed != copySum {
+		t.Fatalf("digest (b) printed %s, sha256 of the bytes that ran %s", printed, copySum)
 	}
 	if _, err := os.Stat(copyPath); !os.IsNotExist(err) {
 		t.Fatalf("private copy %s still present after the run: %v", copyPath, err)

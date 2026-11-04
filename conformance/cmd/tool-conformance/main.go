@@ -25,12 +25,13 @@ const egressRemark = "remark: egress was NOT observed: this runner does not conf
 // An image pin does not get it: that case is unchanged.
 const pathResolvedRemark = "remark: argv[0] was resolved through PATH, so this run says nothing about the pinned bytes."
 
-// betweenPinAndRun, when set, runs after check (b) has passed on an asset pin and before
-// check (c) starts. A test uses it to replace the original --asset file. It is nil outside tests.
+// betweenPinAndRun is a test seam. When set, it runs after check (b) has passed on an
+// asset pin and before check (c) starts, so a test can replace the original --asset file.
+// It is nil outside tests.
 var betweenPinAndRun func(assetFile string)
 
-// lastStagedAsset is the absolute path of the private copy for the run in progress,
-// or empty when this run did not stage one. A test reads it from betweenPinAndRun.
+// lastStagedAsset is a test seam. It is the absolute path of the private copy for the
+// run in progress, or empty when this run did not stage one. A test reads it from betweenPinAndRun.
 var lastStagedAsset string
 
 type report struct {
@@ -158,7 +159,7 @@ func check(r *report, schema interface{ Validate(any) error }, schemaID, recordP
 	program, assetDir, ok := checkPin(r, &rec, assetFile)
 	if assetDir != "" {
 		defer func() {
-			if err := os.RemoveAll(assetDir); err != nil {
+			if err := removeStagedAsset(assetDir); err != nil {
 				fmt.Fprintf(r.w, "remark: the private asset copy could not be removed: %v\n", err)
 			}
 			lastStagedAsset = ""
@@ -227,10 +228,11 @@ func privateCopyNote(program string) string {
 }
 
 // checkPin reports whether the run may continue. When (b) PASSED on an asset pin,
-// program is the absolute path of the private copy that was hashed, and assetDir is
-// the directory the caller removes when the run ends. An empty program means (c)
-// resolves argv[0] through PATH: the image pin, and an asset pin with no --asset.
-// assetDir is set whenever a copy was created, including when (b) then FAILs.
+// program is the absolute path of the private copy, and the digest (b) compared is
+// the one computed while that copy was written. assetDir is the directory the caller
+// removes when the run ends. An empty program means (c) resolves argv[0] through PATH:
+// the image pin, and an asset pin with no --asset. assetDir is set whenever a copy
+// was created, including when (b) then FAILs.
 func checkPin(r *report, rec *record, assetFile string) (program, assetDir string, ok bool) {
 	if rec.Pin.Image != "" {
 		msg := "this runner does not pull images; the image pin was not checked"
@@ -244,21 +246,16 @@ func checkPin(r *report, rec *record, assetFile string) (program, assetDir strin
 		r.line("b", "UNMEASURED", fmt.Sprintf("an asset pin (%s) needs --asset <file> to be checked; none was given", rec.Pin.Asset))
 		return "", "", true
 	}
-	dir, copyPath, err := stagePinnedAsset(assetFile)
+	dir, copyPath, got, err := stagePinnedAsset(assetFile)
 	if err != nil {
 		r.line("b", "FAIL", fmt.Sprintf("cannot stage a private copy of --asset: %v", err))
 		return "", "", false
-	}
-	got, err := fileSHA256(copyPath)
-	if err != nil {
-		r.line("b", "FAIL", fmt.Sprintf("cannot read --asset: %v", err))
-		return "", dir, false
 	}
 	if got != rec.Pin.SHA256 {
 		r.line("b", "FAIL", fmt.Sprintf("pin.sha256 is %s but %s has sha256 %s", rec.Pin.SHA256, assetFile, got))
 		return "", dir, false
 	}
-	r.line("b", "PASS", fmt.Sprintf("pin.sha256 matches the sha256 of %s", assetFile))
+	r.line("b", "PASS", fmt.Sprintf("pin.sha256 %s matches the sha256 of the private copy of %s", got, assetFile))
 	return copyPath, dir, true
 }
 
