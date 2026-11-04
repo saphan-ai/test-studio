@@ -1,0 +1,22 @@
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {"driver": {"name": "fixture"}},
+      "results": [
+        {
+          "ruleId": "RULE-NOFP",
+          "message": {"text": "marker-no-fingerprint"},
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {"uri": "notes/readme.txt"},
+                "region": {"startLine": 4}
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
