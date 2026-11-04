@@ -488,10 +488,13 @@ func TestSARIFAgainstAnOutputSchema(t *testing.T) {
 
 func TestToolThatNeverFinishesFailsCheckC(t *testing.T) {
 	rec := mutate(t, func(r map[string]any) { r["command"].([]any)[2] = "sleep" })
+	scratch := t.TempDir()
+	t.Setenv("TMPDIR", scratch)
 	code, out := runRecord(t, rec, append(withAsset(t), "--timeout", "300ms")...)
 	if code != 1 || !strings.HasPrefix(statusLine(out, "c"), "(c) FAIL:") || !strings.Contains(out, "did not finish") {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
+	assertNoPrivateAssetCopy(t, scratch)
 }
 
 func TestUsageErrorsExitTwo(t *testing.T) {

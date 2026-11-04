@@ -17,6 +17,28 @@ func writeScript(t *testing.T, path, body string) {
 	}
 }
 
+// assertNoPrivateAssetCopy fails when dir still holds a staging directory.
+// dir is a TMPDIR set for one run. MkdirTemp reads that variable, so a copy
+// the runner did not remove is visible here, and a copy it did remove is not.
+// Setting TMPDIR does not change the defer that removes the directory; it
+// only gives the assertion an empty directory to read.
+func assertNoPrivateAssetCopy(t *testing.T, dir string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "tool-conformance-asset-") {
+			left = append(left, e.Name())
+		}
+	}
+	if len(left) != 0 {
+		t.Fatalf("TMPDIR still holds a private asset copy: %s", strings.Join(left, ", "))
+	}
+}
+
 // pathDecoy is a program named like the pin's asset. It records that it ran and exits 9,
 // which is not the pinned file's exit.
 func pathDecoy(t *testing.T, sentinel string) string {
@@ -97,6 +119,8 @@ func TestMismatchedAssetStopsBeforeThePathBinaryRuns(t *testing.T) {
 	if err := os.WriteFile(wrong, []byte("not the pinned file\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	scratch := t.TempDir()
+	t.Setenv("TMPDIR", scratch)
 	code, out := runRecord(t, assetRecord(t, sum), "--asset", wrong)
 	if code != 1 || !strings.HasPrefix(statusLine(out, "b"), "(b) FAIL:") || !strings.Contains(statusLine(out, "b"), "pin.sha256") {
 		t.Fatalf("exit %d, check (b) %q, want FAIL naming pin.sha256\n%s", code, statusLine(out, "b"), out)
@@ -111,6 +135,7 @@ func TestMismatchedAssetStopsBeforeThePathBinaryRuns(t *testing.T) {
 	if _, err := os.Stat(asset); err != nil {
 		t.Fatal(err)
 	}
+	assertNoPrivateAssetCopy(t, scratch)
 }
 
 // TestAssetPinWithoutFileSaysNothingAboutThePinnedBytes: with no --asset, (c) still runs
