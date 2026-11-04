@@ -93,11 +93,20 @@ type runResult struct {
 }
 
 // runTool executes the record's argv, with no shell, inside root, and waits at most timeout.
-func runTool(rec *record, root string, timeout time.Duration) (runResult, error) {
+// When program is set, it is the absolute --asset path and it replaces command[0]; command[1:]
+// is still what runs, after the same placeholder substitution.
+func runTool(rec *record, root string, timeout time.Duration, program string) (runResult, error) {
 	vals := bind(rec, root)
 	argv := make([]string, len(rec.Command))
 	for i, el := range rec.Command {
 		argv[i] = substitute(el, vals)
+	}
+	if program != "" {
+		rest := []string{}
+		if len(argv) > 1 {
+			rest = argv[1:]
+		}
+		argv = append([]string{program}, rest...)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

@@ -21,6 +21,10 @@ import (
 
 const egressRemark = "remark: egress was NOT observed: this runner does not confine the tool and cannot see its network traffic, so no line above says anything about it; the engine's gate does the confining and the observing."
 
+// pathResolvedRemark is printed under (c) when the run did not execute a pinned asset file.
+// An image pin does not get it: that case is unchanged.
+const pathResolvedRemark = "remark: argv[0] was resolved through PATH, so this run says nothing about the pinned bytes."
+
 type report struct {
 	w                  io.Writer
 	pass, fail, na, un int
@@ -43,6 +47,16 @@ func (r *report) line(letter, status, text string) {
 func (r *report) detail(lines ...string) {
 	for _, l := range lines {
 		fmt.Fprintf(r.w, "    %s\n", l)
+	}
+}
+
+// lineC prints a check (c) line. When the program is the pinned asset, text already names that
+// path. When it is not, and the pin is an asset pin, the line ends with the PATH remark.
+func (r *report) lineC(rec *record, program, status, text string, extra ...string) {
+	r.line("c", status, text)
+	r.detail(extra...)
+	if program == "" && rec.Pin.Image == "" {
+		r.detail(pathResolvedRemark)
 	}
 }
 
@@ -130,42 +144,52 @@ func check(r *report, schema interface{ Validate(any) error }, schemaID, recordP
 	}
 	r.line("a", "PASS", fmt.Sprintf("record %q validates against %s and the runner's own rules (schema key, required keys, params)", rec.ID, schemaID))
 
-	// (b) the pin
-	if !checkPin(r, &rec, assetFile) {
+	// (b) the pin. A returned path is the absolute --asset file, and only then does (c) execute it.
+	program, ok := checkPin(r, &rec, assetFile)
+	if !ok {
 		return
 	}
 
 	// (c) the run, in a fresh copy of the fixture
 	src := filepath.Join(fixturesRoot, filepath.FromSlash(rec.Fixture.Repo))
 	if st, err := os.Stat(src); err != nil || !st.IsDir() {
-		r.line("c", "FAIL", fmt.Sprintf("fixture.repo %q is not a directory under --fixtures-root %s", rec.Fixture.Repo, fixturesRoot))
+		r.lineC(&rec, program, "FAIL", fmt.Sprintf("fixture.repo %q is not a directory under --fixtures-root %s", rec.Fixture.Repo, fixturesRoot))
 		return
 	}
 	work, err := os.MkdirTemp("", "tool-conformance-*")
 	if err != nil {
-		r.line("c", "FAIL", fmt.Sprintf("cannot make a scratch directory: %v", err))
+		r.lineC(&rec, program, "FAIL", fmt.Sprintf("cannot make a scratch directory: %v", err))
 		return
 	}
 	defer os.RemoveAll(work)
 	root := filepath.Join(work, "repo")
 	if err := copyTree(src, root); err != nil {
-		r.line("c", "FAIL", fmt.Sprintf("cannot copy fixture.repo %q: %v", rec.Fixture.Repo, err))
+		r.lineC(&rec, program, "FAIL", fmt.Sprintf("cannot copy fixture.repo %q: %v", rec.Fixture.Repo, err))
 		return
 	}
 	outPath := filepath.Join(root, filepath.FromSlash(rec.Output.Path))
 	if _, err := os.Lstat(outPath); err == nil {
-		r.line("c", "FAIL", fmt.Sprintf("output.path %q already exists in the fixture, so a file there would prove nothing about the tool", rec.Output.Path))
+		r.lineC(&rec, program, "FAIL", fmt.Sprintf("output.path %q already exists in the fixture, so a file there would prove nothing about the tool", rec.Output.Path))
 		return
 	}
-	res, err := runTool(&rec, root, timeout)
+	res, err := runTool(&rec, root, timeout, program)
 	if err != nil {
-		r.line("c", "FAIL", err.Error())
-		if res.tail != "" {
-			r.detail("tool output (tail): " + res.tail)
+		text := err.Error()
+		if program != "" {
+			text += "; ran " + program
 		}
+		extra := []string{}
+		if res.tail != "" {
+			extra = append(extra, "tool output (tail): "+res.tail)
+		}
+		r.lineC(&rec, program, "FAIL", text, extra...)
 		return
 	}
-	r.line("c", "PASS", fmt.Sprintf("the argv ran in a fresh copy of fixture %q and exited with code %d", rec.Fixture.Repo, res.code))
+	text := fmt.Sprintf("the argv ran in a fresh copy of fixture %q and exited with code %d", rec.Fixture.Repo, res.code)
+	if program != "" {
+		text += "; ran " + program
+	}
+	r.lineC(&rec, program, "PASS", text)
 
 	// (d) the exit code
 	if !checkExit(r, &rec, res) {
@@ -176,31 +200,38 @@ func check(r *report, schema interface{ Validate(any) error }, schemaID, recordP
 	checkOutput(r, &rec, outPath, outputSchema)
 }
 
-func checkPin(r *report, rec *record, assetFile string) bool {
+// checkPin reports whether the run may continue, and, when (b) PASSED on an asset pin, the absolute
+// path of the --asset file. That path is the program (c) executes. An empty path means (c) resolves
+// argv[0] through PATH, which is the image-pin case and the asset pin with no --asset.
+func checkPin(r *report, rec *record, assetFile string) (string, bool) {
 	if rec.Pin.Image != "" {
 		msg := "this runner does not pull images; the image pin was not checked"
 		if assetFile != "" {
 			msg += fmt.Sprintf("; --asset %s was given and ignored, because an image pin names no file", assetFile)
 		}
 		r.line("b", "NOT APPLICABLE", msg)
-		return true
+		return "", true
 	}
 	if assetFile == "" {
 		r.line("b", "UNMEASURED", fmt.Sprintf("an asset pin (%s) needs --asset <file> to be checked; none was given", rec.Pin.Asset))
-		return true
+		return "", true
 	}
 	got, err := fileSHA256(assetFile)
 	if err != nil {
 		r.line("b", "FAIL", fmt.Sprintf("cannot read --asset: %v", err))
-		return false
+		return "", false
 	}
 	if got != rec.Pin.SHA256 {
 		r.line("b", "FAIL", fmt.Sprintf("pin.sha256 is %s but %s has sha256 %s", rec.Pin.SHA256, assetFile, got))
-		return false
+		return "", false
+	}
+	abs, err := filepath.Abs(assetFile)
+	if err != nil {
+		r.line("b", "FAIL", fmt.Sprintf("cannot make --asset absolute: %v", err))
+		return "", false
 	}
 	r.line("b", "PASS", fmt.Sprintf("pin.sha256 matches the sha256 of %s", assetFile))
-	r.detail("remark: the runner hashes the file you name; it does not check that argv[0] resolves to that file.")
-	return true
+	return abs, true
 }
 
 func checkExit(r *report, rec *record, res runResult) bool {
