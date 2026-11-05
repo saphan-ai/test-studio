@@ -1,0 +1,9 @@
+waivers:
+  - rule: RULE-NEW
+    fingerprint: newfingerprint0001
+    reason: synthetic fixture finding
+    expires: 2027-03-31
+  - rule: RULE-NOFP
+    fingerprint: "saphan/v1:615d985a31f144b6"
+    reason: synthetic fixture finding with no scanner fingerprint
+    expires: 2027-03-31

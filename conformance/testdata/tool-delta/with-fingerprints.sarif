@@ -1,0 +1,23 @@
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {"driver": {"name": "fixture"}},
+      "results": [
+        {
+          "ruleId": "RULE-FP",
+          "message": {"text": "marker-with-fingerprint"},
+          "partialFingerprints": {"primaryLocationLineHash": "abc123fingerprint"},
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {"uri": "notes/other.txt"},
+                "region": {"startLine": 2}
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -358,11 +358,16 @@ A repository may hold a file `.saphan-waivers.yaml` at its root that accepts spe
 ```yaml
 waivers:
   - rule: synthetic-fixture-token          # the rule id of the finding (SARIF result.ruleId)
-    fingerprint: 3f9a1c7e5b2d4a60          # a value of the result's partialFingerprints or fingerprints
+    fingerprint: 3f9a1c7e5b2d4a60          # a partialFingerprints or fingerprints value, or the derived fingerprint
     reason: "synthetic value in a test fixture; see its README"
     expires: 2027-03-31                    # a calendar date, UTC
 ```
 
+- `fingerprint` is a value of the result's `partialFingerprints` or `fingerprints` or, when the result has
+  neither, the derived fingerprint. The derived fingerprint is `saphan/v1:` followed by the first 16
+  hexadecimal characters of the SHA-256 of `ruleId`, a NUL byte, the result's first location
+  `artifactLocation.uri`, a NUL byte, and `message.text`, in that order. The line number is not part of
+  the hash, so an edit above the finding does not change the identity.
 - All four fields are required for each waiver; an entry missing one is refused, naming it.
 - A waiver applies to the findings whose rule id equals `rule` and one of whose fingerprints equals `fingerprint`, and
   to no other.
@@ -374,6 +379,28 @@ waivers:
 
 The public conformance runner does not read waivers: a fixture is checked as it is. This section is what a gate that
 does must do.
+
+### The delta
+
+`tool-delta` compares a current SARIF report with an optional baseline and an optional waiver file:
+
+```
+tool-delta --current <sarif> [--baseline <sarif>] [--waivers <.saphan-waivers.yaml>] [--today <YYYY-MM-DD>]
+```
+
+A result's identity is the first value of `partialFingerprints`, otherwise the first value of `fingerprints`,
+otherwise the derived fingerprint defined above. A result is new when that `(ruleId, identity)` pair is not in
+the baseline. With no baseline, every result is new. Waivers apply to the new results only.
+
+The command prints one line per new result, `NEW <ruleId> <identity> <uri>:<startLine>`; one line per waived
+result, `WAIVED <ruleId> <identity> until <expires>`; and one line per expired waiver that matched a new result,
+`EXPIRED <rule> <fingerprint> <reason> expired <expires>`. A finding matched only by an expired waiver is also
+printed as `NEW`. The summary line is `delta: <n> new, <w> waived, <e> expired`. The last line is
+`remark: identity by derived fingerprint shifts if the rule's message or the file path changes.`
+
+The exit code is 0 when no `NEW` line was printed, 1 when at least one was, and 2 for a usage or input error.
+A waiver entry missing a field is an input error; the refusal names that entry's zero-based index and the field.
+`--today` defaults to the current UTC date. The finding's message is never printed.
 
 ## Reporting to Tests Studio
 

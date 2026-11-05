@@ -1,0 +1,36 @@
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {"driver": {"name": "fixture"}},
+      "results": [
+        {
+          "ruleId": "RULE-FP",
+          "message": {"text": "marker-with-fingerprint"},
+          "partialFingerprints": {"primaryLocationLineHash": "abc123fingerprint"},
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {"uri": "notes/other.txt"},
+                "region": {"startLine": 2}
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "RULE-NEW",
+          "message": {"text": "marker-added-finding"},
+          "partialFingerprints": {"primaryLocationLineHash": "newfingerprint0001"},
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {"uri": "notes/added.txt"},
+                "region": {"startLine": 7}
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
