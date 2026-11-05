@@ -30,6 +30,106 @@ func fileSHA256(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// assetStageDirMode is the staging directory after the copy is closed: read and
+// execute only, so the owner cannot rename or unlink the file before (c) starts.
+// assetStageFileMode is the copy itself. assetStageWriteMode is what removal
+// restores, because the owner cannot unlink entries in a mode 0500 directory.
+const (
+	assetStageDirMode   os.FileMode = 0o500
+	assetStageFileMode  os.FileMode = 0o500
+	assetStageWriteMode os.FileMode = 0o700
+)
+
+// stagePinnedAsset copies assetFile into a new private directory and returns that
+// directory, the absolute path of the copy, and the sha256 of the bytes written.
+// That digest is the one read of the source. The directory is made read-and-execute
+// only after the copy is closed. On failure the directory is removed.
+// The caller removes it when the run ends.
+func stagePinnedAsset(assetFile string) (dir, copyPath, sum string, err error) {
+	dir, err = os.MkdirTemp("", "tool-conformance-asset-*")
+	if err != nil {
+		return "", "", "", err
+	}
+	// created is not the named result: a failing return clears dir before this defer runs.
+	created := dir
+	defer func() {
+		if err != nil {
+			if rerr := removeStagedAsset(created); rerr != nil {
+				err = fmt.Errorf("%w (and removing %s: %v)", err, created, rerr)
+			}
+		}
+	}()
+	dst := filepath.Join(dir, stagedAssetName(assetFile))
+	sum, err = copyPinnedAsset(assetFile, dst)
+	if err != nil {
+		return "", "", "", err
+	}
+	// The copy is closed. Lock the directory so the file cannot be renamed or unlinked.
+	if err = os.Chmod(dir, assetStageDirMode); err != nil {
+		return "", "", "", err
+	}
+	copyPath, err = filepath.Abs(dst)
+	if err != nil {
+		return "", "", "", err
+	}
+	return dir, copyPath, sum, nil
+}
+
+// removeStagedAsset removes a private asset directory. The directory is mode 0500
+// once staging has finished, and that mode refuses unlink, so removal restores
+// write permission first. A directory that never reached that chmod is already
+// writable; restoring write permission there is the same act.
+func removeStagedAsset(dir string) error {
+	if err := os.Chmod(dir, assetStageWriteMode); err != nil {
+		return err
+	}
+	return os.RemoveAll(dir)
+}
+
+// stagedAssetName is the copy's base name. A base that is not a single path element
+// becomes "asset", so the copy cannot be written outside the private directory.
+func stagedAssetName(assetFile string) string {
+	name := filepath.Base(assetFile)
+	if name == "." || name == ".." || name == string(filepath.Separator) {
+		return "asset"
+	}
+	return name
+}
+
+// copyPinnedAsset copies the bytes of src to dst at assetStageFileMode and returns
+// the sha256 of the bytes the destination accepted. The hasher is second in the
+// writer, so a short write is not hashed. os.Open follows a symlink, so the copy
+// is the target's bytes, not the link. The file is closed before this returns.
+func copyPinnedAsset(src, dst string) (sum string, err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if cerr := in.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, assetStageFileMode)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if cerr := out.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+	h := sha256.New()
+	if _, err = io.Copy(io.MultiWriter(out, h), in); err != nil {
+		return "", err
+	}
+	// OpenFile applies the umask. Chmod sets the mode the staging contract requires.
+	if err = os.Chmod(dst, assetStageFileMode); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 // copyTree copies the regular files and directories under src into dst. A symlink or any other special file is
 // refused: the copy must not point back out of itself.
 func copyTree(src, dst string) error {
@@ -93,11 +193,21 @@ type runResult struct {
 }
 
 // runTool executes the record's argv, with no shell, inside root, and waits at most timeout.
-func runTool(rec *record, root string, timeout time.Duration) (runResult, error) {
+// When program is set, it is the absolute path of the private asset copy. It replaces
+// command[0], which is dropped and not compared with pin.asset. command[1:] is still
+// what runs, after the same placeholder substitution.
+func runTool(rec *record, root string, timeout time.Duration, program string) (runResult, error) {
 	vals := bind(rec, root)
 	argv := make([]string, len(rec.Command))
 	for i, el := range rec.Command {
 		argv[i] = substitute(el, vals)
+	}
+	if program != "" {
+		rest := []string{}
+		if len(argv) > 1 {
+			rest = argv[1:]
+		}
+		argv = append([]string{program}, rest...)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
