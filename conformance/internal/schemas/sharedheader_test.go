@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
 )
 
 const allZeroCorrelationID = "00000000000000000000000000000000"

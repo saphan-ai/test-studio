@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/tracectx"
+	"github.com/saphan-ai/test-studio/adapters/go-test/tracectx"
 )
 
 // Adapter identity, written into every event and into the run result.

@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
 )
 
 // The mutants. Each one breaks exactly one rule of the specification.

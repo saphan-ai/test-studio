@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
-	"github.com/saphan-ai/tests-studio/conformance/internal/stubs"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/stubs"
 )
 
 var httpMethods = []string{"get", "put", "post", "delete", "patch", "head", "options"}

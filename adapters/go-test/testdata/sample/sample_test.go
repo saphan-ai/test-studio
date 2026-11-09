@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/tracectx"
+	"github.com/saphan-ai/test-studio/adapters/go-test/tracectx"
 )
 
 func TestPasses(t *testing.T) {

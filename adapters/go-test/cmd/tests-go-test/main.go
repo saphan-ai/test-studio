@@ -16,8 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/gotest"
-	"github.com/saphan-ai/tests-studio/adapters/go-test/reporter"
+	"github.com/saphan-ai/test-studio/adapters/go-test/gotest"
+	"github.com/saphan-ai/test-studio/adapters/go-test/reporter"
 )
 
 type mockList []string

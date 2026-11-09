@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/gotest"
+	"github.com/saphan-ai/test-studio/adapters/go-test/gotest"
 )
 
 func TestCheckArgsRefusesEveryFlagThatMisreports(t *testing.T) {

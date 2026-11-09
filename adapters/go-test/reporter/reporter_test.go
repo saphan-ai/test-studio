@@ -20,7 +20,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/reporter"
+	"github.com/saphan-ai/test-studio/adapters/go-test/reporter"
 )
 
 const (

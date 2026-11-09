@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/sampleadapter"
+	"github.com/saphan-ai/test-studio/conformance/internal/sampleadapter"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
 )
 
 // Setting ranges of the one mock the stub declares, mockName.

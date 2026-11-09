@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/checks"
-	"github.com/saphan-ai/tests-studio/conformance/internal/harness"
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
-	"github.com/saphan-ai/tests-studio/conformance/internal/stubs"
+	"github.com/saphan-ai/test-studio/conformance/internal/checks"
+	"github.com/saphan-ai/test-studio/conformance/internal/harness"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/stubs"
 )
 
 const importSummary = "SUMMARY 15 checks, 13 passed, 0 failed, 2 not applicable (import profile)"

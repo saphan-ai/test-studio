@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/reporter"
+	"github.com/saphan-ai/test-studio/adapters/go-test/reporter"
 )
 
 // The runner that run() builds is what starts every go test, so its environment is where the

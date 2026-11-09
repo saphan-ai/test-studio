@@ -11,9 +11,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
-	"github.com/saphan-ai/tests-studio/conformance/internal/stubs"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/stubs"
 )
 
 // Check ids. They are the public names of the checks; the specification lists them.

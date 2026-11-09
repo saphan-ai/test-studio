@@ -1,4 +1,4 @@
-module github.com/saphan-ai/tests-studio/conformance
+module github.com/saphan-ai/test-studio/conformance
 
 go 1.26
 
