@@ -28,7 +28,7 @@ const (
 	apacheSHA256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 	ccBySHA256   = "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411"
 
-	advisoryURL = "https://github.com/saphan-ai/tests-studio/security/advisories/new"
+	advisoryURL = "https://github.com/saphan-ai/test-studio/security/advisories/new"
 
 	commandTimeout = 10 * time.Minute
 )
@@ -39,7 +39,7 @@ var (
 		"The problem",
 		"How it works",
 		"See a real example",
-		"Make your test framework report to Tests Studio",
+		"Make your test framework report to Test Studio",
 		"What is measured",
 		"Honest limits",
 		"Built in public",
@@ -137,8 +137,8 @@ func checkSections(t *testing.T, file string, required []string) {
 func TestReadmeFirstScreen(t *testing.T) {
 	doc := readDoc(t, "README.md")
 	lines := strings.Split(doc, "\n")
-	if len(lines) == 0 || lines[0] != "# Tests Studio" {
-		t.Fatalf("README.md must open with the line \"# Tests Studio\"")
+	if len(lines) == 0 || lines[0] != "# Test Studio" {
+		t.Fatalf("README.md must open with the line \"# Test Studio\"")
 	}
 	for _, l := range lines[1:] {
 		if strings.HasPrefix(l, "## ") {

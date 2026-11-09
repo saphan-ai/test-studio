@@ -1,8 +1,8 @@
 # Security
 
-This repository holds a specification and a program, `tests-conformance`, that runs **someone else's code** to check it: your test-runner adapter, started as a child process, and the sample project it runs. It also starts two small servers on your machine's loopback address that play the Tests Studio core and the Mocks Studio core. Each of those parts is a place something could reach further than it should: the adapter could read your secrets or outlive its run, a recording could be forged, a result could pass without being measured.
+This repository holds a specification and a program, `tests-conformance`, that runs **someone else's code** to check it: your test-runner adapter, started as a child process, and the sample project it runs. It also starts two small servers on your machine's loopback address that play the Test Studio core and the Mock Studio core. Each of those parts is a place something could reach further than it should: the adapter could read your secrets or outlive its run, a recording could be forged, a result could pass without being measured.
 
-This page says what the suite treats as untrusted, what it protects, how, what has been found and fixed, and what is still being checked. It was read from the code at commit `fa260b4` on `main`. The core of Tests Studio is not in this repository and is not covered here.
+This page says what the suite treats as untrusted, what it protects, how, what has been found and fixed, and what is still being checked. It was read from the code at commit `fa260b4` on `main`. The core of Test Studio is not in this repository and is not covered here.
 
 ## What it treats as untrusted
 
@@ -36,7 +36,7 @@ On Unix the adapter starts in a process group of its own and the whole group is 
 
 ### The adapter never reaches a mock directly
 
-An adapter may change a mock's behaviour only through the Mocks Studio core's operations. The check `mock-control-bypass` fails if any call reaches a mock's own address.
+An adapter may change a mock's behaviour only through the Mock Studio core's operations. The check `mock-control-bypass` fails if any call reaches a mock's own address.
 
 ### A check that has nothing to measure fails
 
@@ -62,6 +62,6 @@ Each was found before the first release.
 
 ## Reporting a vulnerability
 
-Report a vulnerability **privately**, through GitHub's private vulnerability reporting, which is on for this repository: <https://github.com/saphan-ai/tests-studio/security/advisories/new>. Never open a public issue for a vulnerability.
+Report a vulnerability **privately**, through GitHub's private vulnerability reporting, which is on for this repository: <https://github.com/saphan-ai/test-studio/security/advisories/new>. Never open a public issue for a vulnerability.
 
 Say what you ran and what you saw: the command, the adapter or project that triggered it, and the output. A minimal reproduction is the most useful thing you can send. You will get an answer in the advisory thread; we do not publish a deadline we cannot promise, and we will tell you what we find.

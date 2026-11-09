@@ -1,7 +1,7 @@
 # tests-go-test — the Go test runner adapter
 
 `tests-go-test` runs the tests of a Go package with the ordinary `go test` and reports every test
-to a Tests Studio core, following the [test runner specification v1](../../spec/TEST_RUNNER_V1.md).
+to a Test Studio core, following the [test runner specification v1](../../spec/TEST_RUNNER_V1.md).
 Your tests stay plain Go tests. It uses the standard library only; the module's single dependency
 (a JSON Schema validator) is used by its tests and nothing else.
 
@@ -11,7 +11,7 @@ It is accepted by the conformance suite in [`conformance/`](../../conformance): 
 ## Install
 
 ```
-go install github.com/saphan-ai/tests-studio/adapters/go-test/cmd/tests-go-test@latest
+go install github.com/saphan-ai/test-studio/adapters/go-test/cmd/tests-go-test@latest
 ```
 
 This needs Go 1.26 or newer (the `go` directive of `go.mod`).
@@ -67,7 +67,7 @@ not serve); `3` the core could not be reached or would not open or close the run
 
 | variable | meaning |
 |---|---|
-| `TESTS_CORE_URL` | base URL of the Tests Studio core (required) |
+| `TESTS_CORE_URL` | base URL of the Test Studio core (required) |
 | `TESTS_RESULT_FILE` | file the run result is written to |
 | `MOCKS_RUN_ID`, `MOCKS_RUN_TOKEN` | inside a Saphan leg: attach to this run with this credential |
 
@@ -80,7 +80,7 @@ from the environment of every `go test` it starts, and any credential it has hel
 
 The system under test must see the step's `traceparent` and `baggage`, so that a mock's event and
 your test's step meet on one correlation id. The adapter puts them in the test's environment;
-the package `github.com/saphan-ai/tests-studio/adapters/go-test/tracectx` puts them on a request:
+the package `github.com/saphan-ai/test-studio/adapters/go-test/tracectx` puts them on a request:
 
 ```go
 req, _ := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/orders/42", nil)
@@ -139,7 +139,7 @@ same from a test; it skips, naming itself, where loopback is denied, and fails w
 - **Tests run one after another**, not in parallel with each other (`t.Parallel` still works inside
   one test binary).
 - **Mocks are not controlled from the test.** The credentials stay with the adapter, so a Go test
-  cannot call the Mocks Studio core's `setScenario` through this adapter. Scenario control is not
+  cannot call the Mock Studio core's `setScenario` through this adapter. Scenario control is not
   part of this version.
 - A line that a test prints and that looks like a test name can be mistaken for one while listing;
   keep `TestMain` and `init` quiet.

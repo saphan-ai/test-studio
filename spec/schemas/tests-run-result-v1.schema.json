@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "tests.run-result/v1",
-  "title": "Tests Studio run result, version 1",
+  "title": "Test Studio run result, version 1",
   "description": "The document that closes a test run (spec/TEST_RUNNER_V1.md, section 'The run result'). The fields run_id, test_run_id, verdict, counts, started_at, ended_at and events_digest are the ones the ecosystem contract names; the rest is what an adapter needs.",
   "type": "object",
   "additionalProperties": false,
@@ -39,7 +39,7 @@
     },
     "evidence_line": {
       "type": "string",
-      "pattern": "^- evidence: tests-studio-run [a-z0-9][a-z0-9._-]{2,63}/[a-z0-9][a-z0-9._-]{2,63} verdict=(pass|fail|error) events=sha256:[0-9a-f]{64}$"
+      "pattern": "^- evidence: test-studio-run [a-z0-9][a-z0-9._-]{2,63}/[a-z0-9][a-z0-9._-]{2,63} verdict=(pass|fail|error) events=sha256:[0-9a-f]{64}$"
     }
   },
   "$defs": {

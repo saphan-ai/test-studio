@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: Tests Studio core API for test-runner adapters (v1)
+  title: Test Studio core API for test-runner adapters (v1)
   version: 1.0.0
   description: >
-    The calls a test-runner adapter makes to a Tests Studio core (spec/TEST_RUNNER_V1.md). The core
+    The calls a test-runner adapter makes to a Test Studio core (spec/TEST_RUNNER_V1.md). The core
     implements it; this shape is public. Every operation except getSpec and openTestRun requires a
     bearer credential: the test-run credential for everything under /v1/test-runs/{test_run_id},
     the leg's run credential (MOCKS_RUN_TOKEN) for attachTestRun. A missing credential is refused
@@ -243,8 +243,8 @@ components:
         run_id: { $ref: '#/components/schemas/RunId' }
         started_at: { type: string, format: date-time }
         credential: { type: string, description: The test-run credential; returned once. }
-        run_credential: { type: string, description: 'openTestRun only: the credential of the run the core opened, for calls to the Mocks Studio core; returned once.' }
-        mocks_core_url: { type: string, description: Base URL of the Mocks Studio core. }
+        run_credential: { type: string, description: 'openTestRun only: the credential of the run the core opened, for calls to the Mock Studio core; returned once.' }
+        mocks_core_url: { type: string, description: Base URL of the Mock Studio core. }
         endpoints:
           type: object
           description: mock name → { protocol, url }. The system under test uses them; the adapter never calls them.

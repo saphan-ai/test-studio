@@ -1,7 +1,7 @@
 # Test runner specification, version 1.2
 
 This document tells you how to write a **runner adapter**: a small piece of code that makes a test
-framework (pytest, Playwright, Go's `testing`, anything) report to a Tests Studio core. You do not
+framework (pytest, Playwright, Go's `testing`, anything) report to a Test Studio core. You do not
 need the core's code, and you do not need our permission. You implement what is written here, run
 the conformance suite in `conformance/` against your adapter, and **an adapter is accepted when the
 suite passes against it**.
@@ -34,7 +34,7 @@ a run of them into a conversation with the core:
 6. **close** the run, and publish the **run result**.
 
 If a test needs a mock to behave in a certain way (a slow reply, an error), the adapter sets that
-through the **Mocks Studio core**, never through the mock itself (section 8).
+through the **Mock Studio core**, never through the mock itself (section 8).
 
 ### 1.1 Profiles
 
@@ -117,11 +117,11 @@ a removed field or a changed meaning is `v2`.
 
 | variable | when | meaning |
 |---|---|---|
-| `TESTS_CORE_URL` | always | base URL of the Tests Studio core |
+| `TESTS_CORE_URL` | always | base URL of the Test Studio core |
 | `TESTS_RESULT_FILE` | when set | path the adapter writes the run result to (section 7) |
 | `MOCKS_RUN_ID` | inside a leg | the leg's run id; its presence means "attach, never open" |
 | `MOCKS_RUN_TOKEN` | inside a leg | the leg's run credential |
-| `MOCKS_CORE_URL` | inside a leg | base URL of the Mocks Studio core |
+| `MOCKS_CORE_URL` | inside a leg | base URL of the Mock Studio core |
 | `TESTS_RUN_TOKEN` | optional | a test-run credential a parent process hands to a child process of the adapter; the adapter MUST NOT put it on a command line |
 
 The adapter takes the leg's run id and credential from the environment and **never opens a second
@@ -136,7 +136,7 @@ ids (`run_id`, `test_run_id`, `step_id`) are **not secrets** and may travel in t
 a command line or a file. Only the credential is a secret: it travels in `TESTS_RUN_TOKEN` in the
 child's environment, never on a command line and never in a file the child does not own.
 
-**One Mocks Studio core (ruling 9).** Inside a leg the adapter finds the Mocks Studio core in two
+**One Mock Studio core (ruling 9).** Inside a leg the adapter finds the Mock Studio core in two
 places: `MOCKS_CORE_URL` and the `mocks_core_url` of the attach answer. Both name **one**
 service. When they differ the adapter does not choose: it stops and refuses by the name
 `mocks-core-mismatch`, saying both values. (This is an adapter-side refusal, not a core reason
@@ -150,7 +150,7 @@ returned once, by the call that opens or attaches the test run, in that response
 
 - Every call under `/v1/test-runs/{test_run_id}` carries `Authorization: Bearer <credential>`.
 - Attaching carries the leg's run credential (`MOCKS_RUN_TOKEN`) instead.
-- Calls to the Mocks Studio core carry the run credential: `MOCKS_RUN_TOKEN` inside a leg, or the
+- Calls to the Mock Studio core carry the run credential: `MOCKS_RUN_TOKEN` inside a leg, or the
   `run_credential` the open answer returned (standalone).
 - A missing credential is refused `401 run-credential-missing`. A credential that is another
   run's, expired, revoked, or of a closed test run is refused `403 run-credential-invalid`. Neither
@@ -173,10 +173,10 @@ The full shape is `runner-v1.openapi.yaml` (OpenAPI 3.1). In order:
 | `POST /v1/test-runs/{id}/events` | `emitEvent` | one `tests.event/v1` document |
 | `POST /v1/test-runs/{id}/close` | `closeTestRun` | `{verdict, counts, started_at, ended_at, adapter}`; answers the run result |
 
-An adapter never calls the attach operation of the Mocks Studio core. It asks the Tests Studio core
-(`attachTestRun` above), which attaches to the leg's run on the Mocks Studio core with the run
-credential the adapter presented (ecosystem contract sections 1 and 6). A Tests Studio core
-therefore verifies the leg's run credential by presenting it to the Mocks Studio core, and neither
+An adapter never calls the attach operation of the Mock Studio core. It asks the Test Studio core
+(`attachTestRun` above), which attaches to the leg's run on the Mock Studio core with the run
+credential the adapter presented (ecosystem contract sections 1 and 6). A Test Studio core
+therefore verifies the leg's run credential by presenting it to the Mock Studio core, and neither
 keeps nor logs it.
 
 Opening **inside a leg** is refused `403 run-open-not-allowed`; this is the one rule and the one
@@ -260,7 +260,7 @@ Fields: `run_id`, `test_run_id`, `project`, `verdict` (`pass`, `fail`, `error`),
   its credential live, so the adapter can close again with the right tally. `run-result-counts` fails a run whose close was refused (`422 run-result-mismatch`), even when a correct re-close follows: the refusal stays in the recording. The adapter therefore
   counts what the core accepted, not what it meant to send. Only a close the core accepted yields a
   run result.
-- **`events_digest` is copied (ruling 2).** SHA-256 over the event ids of the Mocks Studio core's
+- **`events_digest` is copied (ruling 2).** SHA-256 over the event ids of the Mock Studio core's
   events that carry this `test_run_id`, as that core holds them (ecosystem contract section 6).
   The core computes it and returns it in the close answer; the adapter copies it **verbatim** into
   the run result and MUST NOT compute, reformat or change it. There is one producer of the digest.
@@ -290,25 +290,25 @@ Fields: `run_id`, `test_run_id`, `project`, `verdict` (`pass`, `fail`, `error`),
   The fourth row hashes the bytes `evt-0001\nevt-0002\nevt-0003\n`; the fifth, after sorting to
   `evt-B`, `evt-a-1`, `evt-a.1`, `evt-b`, hashes `evt-B\nevt-a-1\nevt-a.1\nevt-b\n`.
 - **`evidence_line`.** The line a Saphan leg cites in its return, verbatim:
-  `- evidence: tests-studio-run <run_id>/<test_run_id> verdict=<verdict> events=sha256:<hex>`.
-  Whoever verifies it asks the Mocks Studio core for the test run's event ids and recomputes the
+  `- evidence: test-studio-run <run_id>/<test_run_id> verdict=<verdict> events=sha256:<hex>`.
+  Whoever verifies it asks the Mock Studio core for the test run's event ids and recomputes the
   digest; a mismatch or an absent run is a refusal, never a pass.
 
 ## 8. Mock control
 
-An adapter sets a mock's scenario **only** through the Mocks Studio core's operations
+An adapter sets a mock's scenario **only** through the Mock Studio core's operations
 (`ecosystem-v1/mocks-runs-v1.openapi.yaml`, Appendix C of the ecosystem contract):
 `setScenario` (`PUT /v1/runs/{run_id}/mocks/{mock}/settings`), `resetRun`
 (`POST /v1/runs/{run_id}/reset`) and `announceCorrelation`
 (`POST /v1/runs/{run_id}/correlations`). The core validates the setting against the mock's manifest
 and applies it. The adapter MUST NOT call a mock's own control surface, nor any other URL of a
 mock: a mock's URL is for the system under test, not for the adapter. The conformance suite checks
-that no call reaches a mock except through the stub Mocks Studio core (`mock-control-bypass`).
+that no call reaches a mock except through the stub Mock Studio core (`mock-control-bypass`).
 
 `announceCorrelation` is **optional** and exists for protocols that cannot carry the `traceparent`
 and `baggage` headers (ruling 13). An adapter whose test reaches the system under test over HTTP
 with those headers never calls it; one whose protocol has no header (a raw TCP or SMTP exchange)
-calls it to tell the Mocks Studio core which correlation id a step uses.
+calls it to tell the Mock Studio core which correlation id a step uses.
 
 ## 9. Live events: `tests.event/v1`
 
@@ -321,11 +321,11 @@ stream by `run_id`, `correlation_id` and `at`. The schema is
 These fields have **exactly the same schema** in `tests.event/v1` and in `mocks.event/v1`
 (`ecosystem-v1/mocks-event-v1.schema.json`), byte for byte after canonical JSON: `run_id`,
 `test_run_id` (both `$defs/run_id`), `step_id`, `correlation_id` (32 lowercase hex, not all
-zero), `at`, and the `payload` redaction shape. Tests Studio does not redefine them; the
+zero), `at`, and the `payload` redaction shape. Test Studio does not redefine them; the
 `shared-header` test in the conformance module compiles both schemas with the same validator and
 asserts it.
 
-### 9.2 Tests Studio's own fields
+### 9.2 Test Studio's own fields
 
 `schema` (`tests.event/v1`), `event_id`, `kind`, `emitter` (`{name, version, spec}`), `summary`,
 `outcome`.
@@ -358,7 +358,7 @@ retried item (section 6.1). They carry the item's `step_id` and `correlation_id`
 
 Every refusal is a JSON document: `message` (its first sentence says what was measured, what was
 refused and what to do next), `reason_code` (the public key; integrate on it), `allowed` (the
-permitted values, when a set applies). Reason codes of the Tests Studio core:
+permitted values, when a set applies). Reason codes of the Test Studio core:
 
 `spec-version-unsupported` · `run-credential-missing` · `run-credential-invalid` ·
 `run-open-not-allowed` · `run-attached` · `run-already-open` · `run-id-invalid` ·
@@ -377,7 +377,7 @@ A call made with the credential of a test run that has been closed is refused `4
 run-credential-invalid` (section 5): closing revokes the credential, and there is no separate code
 for it.
 
-The Mocks Studio core's reason codes are in Appendix C.
+The Mock Studio core's reason codes are in Appendix C.
 
 ### 10.1 A refused call is never retried (ruling 15)
 
@@ -425,7 +425,7 @@ measurement cannot read as a pass.
 four; the number `4` above is that one). The sample project MUST hold a passing, a failing and a
 skipped test, and at least one test MUST call the stand-in system under test at
 `$TESTS_CONFORMANCE_SUT_URL` (any path under it, say `/sut/ping`) with the `traceparent` and
-`baggage` headers the step was given; one of them SHOULD set a scenario through the Mocks Studio
+`baggage` headers the step was given; one of them SHOULD set a scenario through the Mock Studio
 core. It SHOULD also hold an item whose body never runs (a fixture that fails), which the adapter
 reports as one `error` step (section 6.1), and the run attaches at least one evidence item. The
 suite judges the composition from the results it receives (check `sample-composition`): at least one
@@ -438,7 +438,7 @@ child dies with it. Anywhere else only the command itself is killed. In both cas
 waits at most `--wait-delay` (default 5 s) for any descendant that still holds the command's
 output, and closes the pipes.
 
-The runner starts a **recording stub core** (section 6) and a **stub Mocks Studio core**
+The runner starts a **recording stub core** (section 6) and a **stub Mock Studio core**
 (Appendix C) on loopback, starts your command with their URLs and credentials in its environment
 (section 4, plus `TESTS_CONFORMANCE_SUT_URL`), and checks every recorded call.
 
@@ -485,7 +485,7 @@ The adapter's own exit status is not checked: a test framework exits non-zero wh
 | `credential-not-leaked` | no credential appears in an event, the run result or the adapter's output |
 | `mock-control-bypass` | no call reached a mock's own URL |
 | `sample-composition` | the accepted results hold at least one `pass`, one `fail` and one `skip`, and at least one request reached the stand-in system (ruling 14) |
-| `refusal-not-retried` | no request the core or the Mocks Studio core refused by name was sent again unchanged (ruling 15) |
+| `refusal-not-retried` | no request the core or the Mock Studio core refused by name was sent again unchanged (ruling 15) |
 
 A check that measures something the adapter must DO fails when there is nothing to measure: no
 events, no evidence, no request at the system under test, no step result, no run result. The four
