@@ -13,7 +13,7 @@ import (
 // Service names the stub that received a call.
 type Service string
 
-// The three stubs. Core is the Tests Studio core API, Mocks the Mocks Studio core API
+// The three stubs. Core is the Test Studio core API, Mocks the Mock Studio core API
 // (Appendix C of the ecosystem contract), World the system under test and every mock's own URL.
 const (
 	ServiceCore  Service = "core"

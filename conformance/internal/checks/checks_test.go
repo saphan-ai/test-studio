@@ -212,7 +212,7 @@ func TestEvidenceDigestRejectsEvidenceAfterAcceptedClose(t *testing.T) {
 	body := []byte("the log bytes")
 	declared := strings.TrimPrefix(proto.SHA256Digest(body), "sha256:")
 	evidenceHdr := http.Header{"Tests-Evidence-Kind": {"log"}, "Tests-Step-Id": {"s1"}}
-	closeResult := []byte(`{"schema":"tests.run-result/v1","run_id":"run-1","test_run_id":"tr-1","project":"p","verdict":"pass","counts":{"total":1,"passed":1,"failed":0,"errored":0,"skipped":0},"started_at":"2026-10-29T04:10:00.000Z","ended_at":"2026-10-29T04:10:01.000Z","adapter":{"name":"sample-adapter","version":"1.0.0","spec":"v1"},"events_digest":"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","evidence_line":"- evidence: tests-studio-run run-1/tr-1 verdict=pass events=sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}`)
+	closeResult := []byte(`{"schema":"tests.run-result/v1","run_id":"run-1","test_run_id":"tr-1","project":"p","verdict":"pass","counts":{"total":1,"passed":1,"failed":0,"errored":0,"skipped":0},"started_at":"2026-10-29T04:10:00.000Z","ended_at":"2026-10-29T04:10:01.000Z","adapter":{"name":"sample-adapter","version":"1.0.0","spec":"v1"},"events_digest":"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","evidence_line":"- evidence: test-studio-run run-1/tr-1 verdict=pass events=sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}`)
 	in := Input{
 		Calls: []stubs.Call{
 			{Seq: 1, Service: stubs.ServiceCore, Method: "POST", Path: "/v1/test-runs/tr-1/steps", Header: http.Header{}, Status: http.StatusCreated,

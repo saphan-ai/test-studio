@@ -165,7 +165,7 @@ func (l differingMocksURL) Launch(ctx context.Context, ln harness.Launch) (harne
 }
 
 // TestAdapterRefusesByNameWhenMocksCoreURLsDiffer pins ruling 9 of v1.1: the sample adapter stops
-// with mocks-core-mismatch instead of choosing between two Mocks Studio cores.
+// with mocks-core-mismatch instead of choosing between two Mock Studio cores.
 func TestAdapterRefusesByNameWhenMocksCoreURLsDiffer(t *testing.T) {
 	t.Parallel()
 	dir, err := schemas.FindSpecDir("", ".")

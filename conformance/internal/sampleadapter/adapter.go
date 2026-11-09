@@ -245,7 +245,7 @@ func (a *adapter) open(proj Project) error {
 	// Ruling 9 of v1.1: MOCKS_CORE_URL and the answer's mocks_core_url name one service; when
 	// they differ the adapter refuses by name rather than choosing one.
 	if env := a.env[proto.EnvMocksURL]; env != "" && env != a.opened.MocksCoreURL {
-		return fmt.Errorf("refused [%s]: %s is %q and the core's answer names %q; they must name one Mocks Studio core",
+		return fmt.Errorf("refused [%s]: %s is %q and the core's answer names %q; they must name one Mock Studio core",
 			proto.ReasonMocksCoreMismatch, proto.EnvMocksURL, env, a.opened.MocksCoreURL)
 	}
 	summary := "test run opened for project " + proj.Project
@@ -317,13 +317,13 @@ func (a *adapter) runItem(i int, stepID string, it Item, counts *proto.Counts) {
 
 func (a *adapter) testRunURL() string { return a.coreURL + "/v1/test-runs/" + a.opened.TestRunID }
 
-// setScenario sets the item's mock scenario through the Mocks Studio core, never through the mock.
+// setScenario sets the item's mock scenario through the Mock Studio core, never through the mock.
 func (a *adapter) setScenario(it Item) {
 	if it.Scenario == nil {
 		return
 	}
 	if a.mutant == MutantMockControlDirect {
-		// Breaks one rule: the mock's own control URL is called instead of the Mocks Studio core.
+		// Breaks one rule: the mock's own control URL is called instead of the Mock Studio core.
 		_, _ = a.call("PUT", a.opened.Endpoints[it.Scenario.Mock].URL+"/admin/config", "", nil, it.Scenario.Settings, nil)
 		return
 	}

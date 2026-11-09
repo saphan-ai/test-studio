@@ -76,7 +76,7 @@ func TestStubMocksCoreServesOnlyOperationsOfAppendixC(t *testing.T) {
 	}
 	for _, r := range stubs.MocksRoutes() {
 		if !in[r] {
-			t.Errorf("the stub Mocks Studio core serves %q, which Appendix C does not define", r)
+			t.Errorf("the stub Mock Studio core serves %q, which Appendix C does not define", r)
 		}
 	}
 }

@@ -700,11 +700,11 @@ func mockControl(in Input, _ facts) Result {
 	via := 0
 	for _, c := range in.Calls {
 		if c.Service == stubs.ServiceWorld && strings.HasPrefix(c.Path, "/mock/") {
-			return fail(IDMockControl, "call %d (%s %s) reached a mock's own URL; a mock is controlled only through the Mocks Studio core", c.Seq, c.Method, redactPath(c.Path))
+			return fail(IDMockControl, "call %d (%s %s) reached a mock's own URL; a mock is controlled only through the Mock Studio core", c.Seq, c.Method, redactPath(c.Path))
 		}
 		if c.Service == stubs.ServiceMocks {
 			via++
 		}
 	}
-	return ok(IDMockControl, "%d calls observed, none to a mock's own URL; %d went through the Mocks Studio core", len(in.Calls), via)
+	return ok(IDMockControl, "%d calls observed, none to a mock's own URL; %d went through the Mock Studio core", len(in.Calls), via)
 }

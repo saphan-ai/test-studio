@@ -198,7 +198,7 @@ func (s *Stack) specVersionOK(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
-// coreRoutes is the Tests Studio core API the stub serves, keyed "METHOD /path". A test compares
+// coreRoutes is the Test Studio core API the stub serves, keyed "METHOD /path". A test compares
 // it with spec/runner-v1.openapi.yaml, so the stub and the specification cannot drift apart.
 func (s *Stack) coreRoutes() map[string]http.HandlerFunc {
 	return map[string]http.HandlerFunc{
@@ -226,7 +226,7 @@ func mux(routes map[string]http.HandlerFunc) *http.ServeMux {
 // CoreRoutes lists the stub core's operations as "METHOD /path".
 func CoreRoutes() []string { return keys((&Stack{}).coreRoutes()) }
 
-// MocksRoutes lists the stub Mocks Studio core's operations as "METHOD /path".
+// MocksRoutes lists the stub Mock Studio core's operations as "METHOD /path".
 func MocksRoutes() []string { return keys((&Stack{}).mocksRoutes()) }
 
 func keys(m map[string]http.HandlerFunc) []string {

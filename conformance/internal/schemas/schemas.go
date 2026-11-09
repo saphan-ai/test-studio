@@ -46,13 +46,13 @@ func CompileBytes(name string, raw []byte) (*jsonschema.Schema, error) {
 	return s, nil
 }
 
-// Validator validates documents against the schemas of the Tests Studio specification.
+// Validator validates documents against the schemas of the Test Studio specification.
 type Validator struct {
 	Event     *jsonschema.Schema
 	RunResult *jsonschema.Schema
 }
 
-// Load compiles the Tests Studio schemas found under specDir.
+// Load compiles the Test Studio schemas found under specDir.
 func Load(specDir string) (*Validator, error) {
 	ev, err := Compile(filepath.Join(specDir, TestsEventFile))
 	if err != nil {
