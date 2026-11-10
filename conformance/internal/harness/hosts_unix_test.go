@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/harness"
+	"github.com/saphan-ai/test-studio/conformance/internal/harness"
 )
 
 const (

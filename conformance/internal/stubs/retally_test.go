@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
-	"github.com/saphan-ai/tests-studio/conformance/internal/stubs"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/stubs"
 )
 
 // coreClient serves the stub core in memory, with no socket.

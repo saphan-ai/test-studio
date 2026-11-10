@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
 )
 
 // digestVectors are the known answers of specification section 7. They were computed outside

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/tracectx"
+	"github.com/saphan-ai/test-studio/adapters/go-test/tracectx"
 )
 
 const tp = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"

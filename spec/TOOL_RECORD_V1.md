@@ -399,10 +399,10 @@ The exit code is 0 when no `NEW` line was printed, 1 when at least one was, and 
 A waiver entry missing a field is an input error; the refusal names that entry's zero-based index and the field.
 `--today` defaults to the current UTC date. The finding's message is never printed.
 
-## Reporting to Tests Studio
+## Reporting to Test Studio
 
-A tool run is reported to a Tests Studio runner as **one step** of a test run, using the runner-v1 events and evidence
-calls already defined by the Tests Studio runner specification (`spec/TEST_RUNNER_V1.md`, cited by file only):
+A tool run is reported to a Test Studio runner as **one step** of a test run, using the runner-v1 events and evidence
+calls already defined by the Test Studio runner specification (`spec/TEST_RUNNER_V1.md`, cited by file only):
 
 1. `step.started` for the step, named after the record's `id`.
 2. For a `sarif-2.1.0` output, the SARIF file is attached as **evidence of kind `artifact`**

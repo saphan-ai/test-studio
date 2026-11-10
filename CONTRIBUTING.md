@@ -4,7 +4,7 @@ Thank you for looking. This repository is small on purpose: a specification, and
 
 ## Reporting
 
-- **A problem or a question:** open an issue at <https://github.com/saphan-ai/tests-studio/issues>. Say what you ran, what you expected and what you saw; paste the command and its output.
+- **A problem or a question:** open an issue at <https://github.com/saphan-ai/test-studio/issues>. Say what you ran, what you expected and what you saw; paste the command and its output.
 - **A vulnerability:** never in a public issue. Use the private channel in [`SECURITY.md`](SECURITY.md).
 - **A mistake in the specification** (two sentences that disagree, a rule you cannot implement): an issue is welcome. Quote the section number.
 
@@ -14,7 +14,7 @@ Write an adapter. You do not need our permission and you do not need our code.
 
 1. Read [`spec/TEST_RUNNER_V1.md`](spec/TEST_RUNNER_V1.md).
 2. Write the adapter for your framework, with a small sample project that has a passing, a failing and a skipped test.
-3. Run the conformance suite against it **in both modes**, `standalone` and `leg`. The commands are in the README, under "Make your test framework report to Tests Studio".
+3. Run the conformance suite against it **in both modes**, `standalone` and `leg`. The commands are in the README, under "Make your test framework report to Test Studio".
 4. **An adapter is accepted when every check passes in both modes.** Open a pull request that adds a line to the README's list of adapters, with the suite's output pasted in, the version of the adapter you ran and the date.
 
 Where your adapter lives is up to you; it does not have to be in this repository.

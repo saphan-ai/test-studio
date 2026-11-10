@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "tests.event/v1",
-  "title": "Tests Studio event envelope, version 1",
+  "title": "Test Studio event envelope, version 1",
   "description": "The live event a test-runner adapter emits (spec/TEST_RUNNER_V1.md). The SHARED HEADER fields run_id, test_run_id, step_id, correlation_id, at and payload are byte-identical to the same fields of mocks.event/v1 (spec/ecosystem-v1/mocks-event-v1.schema.json); a console merges both streams on them.",
   "type": "object",
   "additionalProperties": false,

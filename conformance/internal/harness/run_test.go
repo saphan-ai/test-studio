@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/checks"
-	"github.com/saphan-ai/tests-studio/conformance/internal/harness"
-	"github.com/saphan-ai/tests-studio/conformance/internal/sampleadapter"
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
-	"github.com/saphan-ai/tests-studio/conformance/internal/stubs"
+	"github.com/saphan-ai/test-studio/conformance/internal/checks"
+	"github.com/saphan-ai/test-studio/conformance/internal/harness"
+	"github.com/saphan-ai/test-studio/conformance/internal/sampleadapter"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/stubs"
 )
 
 const sampleItems = 4
@@ -165,7 +165,7 @@ func (l differingMocksURL) Launch(ctx context.Context, ln harness.Launch) (harne
 }
 
 // TestAdapterRefusesByNameWhenMocksCoreURLsDiffer pins ruling 9 of v1.1: the sample adapter stops
-// with mocks-core-mismatch instead of choosing between two Mocks Studio cores.
+// with mocks-core-mismatch instead of choosing between two Mock Studio cores.
 func TestAdapterRefusesByNameWhenMocksCoreURLsDiffer(t *testing.T) {
 	t.Parallel()
 	dir, err := schemas.FindSpecDir("", ".")

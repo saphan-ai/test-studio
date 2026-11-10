@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/reporter"
+	"github.com/saphan-ai/test-studio/adapters/go-test/reporter"
 )
 
 // Runner runs Go tests with the go command.

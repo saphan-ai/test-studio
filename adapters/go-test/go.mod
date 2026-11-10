@@ -1,4 +1,4 @@
-module github.com/saphan-ai/tests-studio/adapters/go-test
+module github.com/saphan-ai/test-studio/adapters/go-test
 
 go 1.26
 

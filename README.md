@@ -1,9 +1,9 @@
-# Tests Studio
+# Test Studio
 
-<p align="center"><img src="docs/images/banner.png" alt="Tests Studio: what your tests really proved" width="100%"></p>
+<p align="center"><img src="docs/images/banner.png" alt="Test Studio: what your tests really proved" width="100%"></p>
 
 
-**Tests Studio shows what your tests really proved, in the test framework you already use.**
+**Test Studio shows what your tests really proved, in the test framework you already use.**
 It is for any team whose code, and whose tests, now arrive faster than people can check them, often written by AI
 agents. You do not need to know anything about Saphan to read this page or to use what is in it.
 
@@ -25,13 +25,13 @@ You need Go 1.26 or newer. No account, no key, and no network after the download
 
 Four words, so the commands make sense. A **test run** is one go of your tests; each test in it is a **step**. An
 **adapter** is a small plug-in inside a test framework that reports every step. The **conformance suite** plays the
-part of Tests Studio, watches every call an adapter makes, and says whether each call follows the rules.
+part of Test Studio, watches every call an adapter makes, and says whether each call follows the rules.
 
 Get the code:
 
 ```
-git clone https://github.com/saphan-ai/tests-studio
-cd tests-studio
+git clone https://github.com/saphan-ai/test-studio
+cd test-studio
 ```
 
 Build the suite and the tiny adapter that comes with it, then let the suite judge that adapter. The adapter runs a
@@ -54,7 +54,7 @@ Apple-silicon Mac (abridged):
 PASS spec-version-known — asked GET /v1/spec (call 1), then declared "v1", which the core serves (v1)
 PASS traceparent-to-sut — 2 requests reached the system under test, each with exactly the traceparent and baggage the core handed out
 PASS run-result-counts — counts {Total:4 Passed:1 Failed:1 Errored:1 Skipped:1} equal the steps the core saw, and verdict "error" follows from them
-PASS mock-control-bypass — 29 calls observed, none to a mock's own URL; 2 went through the Mocks Studio core
+PASS mock-control-bypass — 29 calls observed, none to a mock's own URL; 2 went through the Mock Studio core
 SUMMARY 15 checks, 15 passed, 0 failed (standalone mode)
 ```
 
@@ -76,8 +76,8 @@ This is what works today, in this repository.
 4. **One suite judges every adapter.** It prints `PASS` or `FAIL` for each rule. The suite is held to its own standard:
    deliberately broken copies of its sample adapter, each breaking one rule, must each fail exactly one check.
 
-Tests Studio is one of three parts of one platform: Saphan Studio's agents write the code, Mocks Studio supplies the
-mocks, and Tests Studio runs the tests and gives the verdict.
+Test Studio is one of three parts of one platform: Saphan Studio's agents write the code, Mock Studio supplies the
+mocks, and Test Studio runs the tests and gives the verdict.
 
 ## What is in this repository
 
@@ -102,7 +102,7 @@ go -C adapters/go-test build -o ../../bin/tests-go-test ./cmd/tests-go-test
 It passes when every check prints `PASS` and the exit code is 0. Your own tests stay plain Go tests; the helper package
 `tracectx` puts each step's trace tag on your test's requests. Details: [`adapters/go-test/README.md`](adapters/go-test/README.md).
 
-## Make your test framework report to Tests Studio
+## Make your test framework report to Test Studio
 
 1. Read [`spec/TEST_RUNNER_V1.md`](spec/TEST_RUNNER_V1.md). It is written for someone who has never seen our code.
 2. Write the adapter in your framework's own language. There is no library to link: the rules are the product.
@@ -123,8 +123,8 @@ XML file, say), add `--profile import`. If the adapter needs an extra environmen
 ## What it will be
 
 - **More adapters**: pytest (with Appium, for phone apps) and Playwright, judged by the same suite as the Go adapter.
-- **The Tests Studio core, in Saphan Studio**: runs on a schedule or on demand, every result and every piece of evidence
-  kept, live progress, and mocks set up for each run through Mocks Studio.
+- **The Test Studio core, in Saphan Studio**: runs on a schedule or on demand, every result and every piece of evidence
+  kept, live progress, and mocks set up for each run through Mock Studio.
 - **AI helpers on your own model subscription**: they plan tests, explore the app, explain failures and write the
   report, and every call they make is recorded.
 - **A passing run as proof that work is done**: checked by its fingerprint, by anyone, later.
@@ -141,7 +141,7 @@ Each number below is recomputed from its command by the documentation check on e
 
 - **15** checks the suite runs against an adapter: `sed -n '/^\*\*Checks\*\*/,/^\*\*Mutants/p' spec/TEST_RUNNER_V1.md | grep -c '^| [^ a-z|][a-z0-9-]*[^ a-z|] |'`
 - **18** mutants of the sample adapter, each breaking one rule and failing exactly one check: `sed -n '/^\*\*Mutants/,/^## 13/p' spec/TEST_RUNNER_V1.md | grep -c '^| [^ a-z|][a-z0-9-]*[^ a-z|] |'`
-- **20** refusal reason codes the specification names for the core: `sed -n '/Reason codes of the Tests Studio core/,/^A call made/p' spec/TEST_RUNNER_V1.md | grep -o '[^ a-z|][a-z]*-[a-z-]*[^ a-z|]' | wc -l`
+- **20** refusal reason codes the specification names for the core: `sed -n '/Reason codes of the Test Studio core/,/^A call made/p' spec/TEST_RUNNER_V1.md | grep -o '[^ a-z|][a-z]*-[a-z-]*[^ a-z|]' | wc -l`
 - **4** tests in the sample project (pass, fail, skip, and one whose body never runs): `grep -c '"outcome"' conformance/testdata/sample-project/tests.json`
 
 What is not here, because it is not measured on this page: how fast the suite runs, and how many adapters pass it.
@@ -173,7 +173,7 @@ private channel in [`SECURITY.md`](SECURITY.md), never to a public issue.
 The table under "What is in this repository" names every top-level part. Inside them: `conformance/cmd/` holds
 `tests-conformance`, `sample-adapter` and `tool-conformance`; `conformance/internal/` the harness, the stand-in servers
 and the checks; `conformance/testdata/` the sample project and the tool fixtures; `spec/ecosystem-v1/` copies of the
-contract shared with Mocks Studio (do not edit).
+contract shared with Mock Studio (do not edit).
 
 ## Documentation
 
@@ -183,7 +183,7 @@ report a vulnerability ([`SECURITY.md`](SECURITY.md)), and how to add an adapter
 
 ## For technical readers
 
-The suite is the Go module `github.com/saphan-ai/tests-studio/conformance` (dependencies: a JSON Schema validator and a
+The suite is the Go module `github.com/saphan-ai/test-studio/conformance` (dependencies: a JSON Schema validator and a
 YAML reader). The adapter runs as a child process in its own process group, with a scrubbed environment, bounded by
 `--timeout` (default 120 seconds). A check of something the adapter must do fails when there is nothing to measure; a
 check of something it must not do passes only after counting the calls it looked at.

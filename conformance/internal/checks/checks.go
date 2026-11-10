@@ -11,9 +11,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
-	"github.com/saphan-ai/tests-studio/conformance/internal/stubs"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/stubs"
 )
 
 // Check ids. They are the public names of the checks; the specification lists them.
@@ -700,11 +700,11 @@ func mockControl(in Input, _ facts) Result {
 	via := 0
 	for _, c := range in.Calls {
 		if c.Service == stubs.ServiceWorld && strings.HasPrefix(c.Path, "/mock/") {
-			return fail(IDMockControl, "call %d (%s %s) reached a mock's own URL; a mock is controlled only through the Mocks Studio core", c.Seq, c.Method, redactPath(c.Path))
+			return fail(IDMockControl, "call %d (%s %s) reached a mock's own URL; a mock is controlled only through the Mock Studio core", c.Seq, c.Method, redactPath(c.Path))
 		}
 		if c.Service == stubs.ServiceMocks {
 			via++
 		}
 	}
-	return ok(IDMockControl, "%d calls observed, none to a mock's own URL; %d went through the Mocks Studio core", len(in.Calls), via)
+	return ok(IDMockControl, "%d calls observed, none to a mock's own URL; %d went through the Mock Studio core", len(in.Calls), via)
 }

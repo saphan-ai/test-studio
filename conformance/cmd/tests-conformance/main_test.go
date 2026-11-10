@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/harness"
+	"github.com/saphan-ai/test-studio/conformance/internal/harness"
 )
 
 // TestRunnerExitsWithUsageCodeWhenTheSuiteCannotRun covers every exit-4 path that is reached

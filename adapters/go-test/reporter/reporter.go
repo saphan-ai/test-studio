@@ -1,4 +1,4 @@
-// Package reporter is the protocol half of the Go test adapter: it speaks the Tests Studio test
+// Package reporter is the protocol half of the Go test adapter: it speaks the Test Studio test
 // runner specification v1 (spec/TEST_RUNNER_V1.md) and knows nothing about how a Go test is
 // started. A Runner supplies the test items and runs them; package gotest is the Runner that uses
 // the `go` command.
@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/tracectx"
+	"github.com/saphan-ai/test-studio/adapters/go-test/tracectx"
 )
 
 // Adapter identity, written into every event and into the run result.
@@ -140,7 +140,7 @@ func Run(ctx context.Context, cfg Config) int {
 	}
 	r.coreURL = strings.TrimRight(r.env[envCoreURL], "/")
 	if r.coreURL == "" {
-		r.logf("%s is not set, so there is no Tests Studio core to report to. NEXT — set it to the core's base URL.", envCoreURL)
+		r.logf("%s is not set, so there is no Test Studio core to report to. NEXT — set it to the core's base URL.", envCoreURL)
 		return ExitRefused
 	}
 	if code := r.negotiate(ctx); code != ExitPass {

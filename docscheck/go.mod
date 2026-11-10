@@ -1,3 +1,3 @@
-module github.com/saphan-ai/tests-studio/docscheck
+module github.com/saphan-ai/test-studio/docscheck
 
 go 1.26

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
 )
 
 // recordingRoundTripper answers the stub core's two calls the adapter needs and records every

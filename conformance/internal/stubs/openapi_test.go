@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/schemas"
-	"github.com/saphan-ai/tests-studio/conformance/internal/stubs"
+	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
+	"github.com/saphan-ai/test-studio/conformance/internal/stubs"
 )
 
 var httpMethods = []string{"get", "put", "post", "delete", "patch", "head", "options"}
@@ -76,7 +76,7 @@ func TestStubMocksCoreServesOnlyOperationsOfAppendixC(t *testing.T) {
 	}
 	for _, r := range stubs.MocksRoutes() {
 		if !in[r] {
-			t.Errorf("the stub Mocks Studio core serves %q, which Appendix C does not define", r)
+			t.Errorf("the stub Mock Studio core serves %q, which Appendix C does not define", r)
 		}
 	}
 }

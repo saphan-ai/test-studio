@@ -20,7 +20,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/reporter"
+	"github.com/saphan-ai/test-studio/adapters/go-test/reporter"
 )
 
 const (
@@ -176,7 +176,7 @@ func (f *fakeCore) testRunCall(w http.ResponseWriter, r *http.Request, body []by
 		reply(200, map[string]any{
 			"schema": "tests.run-result/v1", "run_id": "conf-run-1", "test_run_id": testRunID, "project": "example.test/project",
 			"verdict": verdict, "counts": counts, "started_at": doc["started_at"], "ended_at": doc["ended_at"], "events_digest": digest,
-			"adapter": doc["adapter"], "evidence_line": "- evidence: tests-studio-run conf-run-1/" + testRunID + " verdict=" + verdict + " events=" + digest,
+			"adapter": doc["adapter"], "evidence_line": "- evidence: test-studio-run conf-run-1/" + testRunID + " verdict=" + verdict + " events=" + digest,
 		})
 	default:
 		f.refuse(w, 404, "request-invalid")
@@ -292,7 +292,7 @@ func TestStandaloneRunReportsEveryTest(t *testing.T) {
 	if rr.Counts != (reporter.Counts{Total: 3, Passed: 1, Failed: 1, Skipped: 1}) {
 		t.Errorf("counts %+v", rr.Counts)
 	}
-	if line := strings.TrimSpace(out.stdout); !strings.HasPrefix(line, "- evidence: tests-studio-run conf-run-1/"+testRunID+" verdict=fail events=sha256:") || strings.Contains(strings.TrimSpace(out.stdout), "\n") {
+	if line := strings.TrimSpace(out.stdout); !strings.HasPrefix(line, "- evidence: test-studio-run conf-run-1/"+testRunID+" verdict=fail events=sha256:") || strings.Contains(strings.TrimSpace(out.stdout), "\n") {
 		t.Errorf("standard output is %q, want exactly the evidence line", out.stdout)
 	}
 }

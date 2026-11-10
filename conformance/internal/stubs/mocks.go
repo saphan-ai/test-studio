@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/saphan-ai/tests-studio/conformance/internal/proto"
+	"github.com/saphan-ai/test-studio/conformance/internal/proto"
 )
 
 // Setting ranges of the one mock the stub declares, mockName.
@@ -21,7 +21,7 @@ var (
 )
 
 // mocksRoutes is the part of Appendix C the stub serves to a runner adapter, keyed "METHOD /path".
-// openRun is served only to refuse it: an adapter opens its run through the Tests Studio core.
+// openRun is served only to refuse it: an adapter opens its run through the Test Studio core.
 func (s *Stack) mocksRoutes() map[string]http.HandlerFunc {
 	return map[string]http.HandlerFunc{
 		"POST /v1/runs":                               s.mocksOpenRun,
@@ -44,10 +44,10 @@ func (s *Stack) mocksAuth(w http.ResponseWriter, r *http.Request) bool {
 	return credentialOK(w, r, want)
 }
 
-// mocksOpenRun refuses: a runner adapter never opens a run on the Mocks Studio core itself.
+// mocksOpenRun refuses: a runner adapter never opens a run on the Mock Studio core itself.
 func (s *Stack) mocksOpenRun(w http.ResponseWriter, _ *http.Request) {
 	refuse(w, http.StatusForbidden, proto.ReasonOpenNotAllowed,
-		"A call to openRun on the Mocks Studio core was measured from a runner adapter, and it was refused: a runner adapter opens its run through the Tests Studio core, or attaches to its leg's run. NEXT — call openTestRun or attachTestRun on the Tests Studio core.", nil)
+		"A call to openRun on the Mock Studio core was measured from a runner adapter, and it was refused: a runner adapter opens its run through the Test Studio core, or attaches to its leg's run. NEXT — call openTestRun or attachTestRun on the Test Studio core.", nil)
 }
 
 func (s *Stack) mocksGetRun(w http.ResponseWriter, r *http.Request) {

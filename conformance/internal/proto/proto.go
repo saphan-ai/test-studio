@@ -16,12 +16,12 @@ const SpecVersion = "v1"
 // Environment variables an adapter reads. The first group is what the conformance runner (and, in
 // production, the core or a Saphan leg) puts into the adapter's environment.
 const (
-	EnvCoreURL    = "TESTS_CORE_URL"            // base URL of the Tests Studio core
+	EnvCoreURL    = "TESTS_CORE_URL"            // base URL of the Test Studio core
 	EnvRunToken   = "TESTS_RUN_TOKEN"           // optional: a test-run credential handed on by a parent process
 	EnvResultFile = "TESTS_RESULT_FILE"         // path the adapter writes the run result to
 	EnvLegRunID   = "MOCKS_RUN_ID"              // inside a leg: the leg's run id
 	EnvLegToken   = "MOCKS_RUN_TOKEN"           // inside a leg: the leg's run credential
-	EnvMocksURL   = "MOCKS_CORE_URL"            // inside a leg: base URL of the Mocks Studio core
+	EnvMocksURL   = "MOCKS_CORE_URL"            // inside a leg: base URL of the Mock Studio core
 	EnvSutURL     = "TESTS_CONFORMANCE_SUT_URL" // conformance only: the stand-in system under test
 )
 
@@ -34,7 +34,7 @@ const (
 	HeaderBaggage      = "baggage"
 )
 
-// Reason codes of the Tests Studio core's refusals (the Mocks Studio core's are in Appendix C).
+// Reason codes of the Test Studio core's refusals (the Mock Studio core's are in Appendix C).
 const (
 	ReasonSpecUnsupported  = "spec-version-unsupported"
 	ReasonCredentialAbsent = "run-credential-missing"
@@ -171,7 +171,7 @@ type RunResult struct {
 
 // EvidenceLine is the line a Saphan leg cites, verbatim from section 6 of the ecosystem contract.
 func EvidenceLine(runID, testRunID, verdict, eventsDigest string) string {
-	return "- evidence: tests-studio-run " + runID + "/" + testRunID + " verdict=" + verdict + " events=" + eventsDigest
+	return "- evidence: test-studio-run " + runID + "/" + testRunID + " verdict=" + verdict + " events=" + eventsDigest
 }
 
 // EventsDigest is SHA-256 over the set of event ids, sorted ascending by their UTF-8 bytes, each

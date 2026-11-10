@@ -1,4 +1,4 @@
-// Command tests-go-test runs a Go package's tests and reports every test to a Tests Studio core,
+// Command tests-go-test runs a Go package's tests and reports every test to a Test Studio core,
 // following the test runner specification v1. Usage:
 //
 //	tests-go-test [-project NAME] [-mock NAME]... [packages] [-- go test flags]
@@ -16,8 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/saphan-ai/tests-studio/adapters/go-test/gotest"
-	"github.com/saphan-ai/tests-studio/adapters/go-test/reporter"
+	"github.com/saphan-ai/test-studio/adapters/go-test/gotest"
+	"github.com/saphan-ai/test-studio/adapters/go-test/reporter"
 )
 
 type mockList []string
