@@ -316,6 +316,8 @@ func splitSections(out []byte) sectionSet {
 	for _, line := range strings.Split(string(out), "\n") {
 		if strings.HasPrefix(line, "# ") {
 			cur, _, _ = strings.Cut(strings.TrimPrefix(line, "# "), " ")
+			cur = strings.TrimPrefix(cur, "[")
+			cur = strings.TrimSuffix(cur, "]")
 			file(cur)
 			continue
 		}

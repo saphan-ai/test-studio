@@ -53,3 +53,35 @@ var X int = "s"
 		})
 	}
 }
+
+// TestVetTestFileCompileErrorNamesOneCaseByPackage reproduces B2: a _test.go that does
+// not compile under go-vet. go vet prints "# <path>", "# [<path>]" and the error; the
+// runner must file the error under the package's import path: exactly one failing case,
+// named by the package, no phantom `[<path>]` case.
+func TestVetTestFileCompileErrorNamesOneCaseByPackage(t *testing.T) {
+	t.Parallel()
+	dir := writeModule(t, map[string]string{
+		"t/t.go": `package t
+
+func Add(a, b int) int { return a + b }
+
+`,
+		"t/t_test.go": `package t
+
+var X int = "s"
+
+`,
+	})
+	var stderr bytes.Buffer
+	if code := Run(Vet, dir, nil, &stderr); code != ExitFail {
+		t.Fatalf("vet exit %d on a broken test file, want 1; stderr: %s", code, stderr.String())
+	}
+	s := readSuite(t, dir, "go-vet.junit.xml")
+	got := outcomes(s)
+	if len(got) != 1 || !got["example.invalid/fx/t"] {
+		t.Fatalf("cases = %v, want exactly one failing case: example.invalid/fx/t", got)
+	}
+	if s.Failures != 1 || s.Tests != 1 {
+		t.Fatalf("suite counts tests=%d failures=%d, want 1 and 1", s.Tests, s.Failures)
+	}
+}
