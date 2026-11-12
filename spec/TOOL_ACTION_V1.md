@@ -69,7 +69,8 @@ report whatever happens: when it cannot run, the report holds one error case nam
 ## The record
 
 Beside each `action.yml`, `record.yaml` is a `tool-invocation/v1` record (`spec/TOOL_RECORD_V1.md`). Its `pin.sha256`
-is the sha256 of the runner binary, built with `CGO_ENABLED=0 go build -trimpath -ldflags=-buildid=`. The engine puts
+is the sha256 of the runner binary, built with `CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid=` (without `-buildvcs=false` the binary carries the
+commit it was built from, and the digest changes with every commit). The engine puts
 that digest, and the git blob digest of `action.yml`, into the attestation and refuses a binary whose digest differs.
 The action file carries no digest of its own. A digest depends on the Go toolchain and the platform; the one in the
 record was taken with the toolchain named in `actions/pin-toolchain.txt`, and `go -C actions test ./...` compares it

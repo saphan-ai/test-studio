@@ -134,7 +134,7 @@ func TestRecordPinsTheRunnerBinary(t *testing.T) {
 		t.Run(id, func(t *testing.T) {
 			rec, _ := loadRecord(t, id)
 			bin := filepath.Join(t.TempDir(), id)
-			cmd := exec.Command("go", "build", "-trimpath", "-ldflags=-buildid=", "-o", bin, "../"+id)
+			cmd := exec.Command("go", "build", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", bin, "../"+id)
 			cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("cannot build %s: %v\n%s", id, err, out)
