@@ -170,8 +170,22 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 			cases = append(cases, makeCase(name, []string{sections.byName[name]}))
 		}
 	}
-	if s := sections.byName[""]; strings.TrimSpace(s) != "" && exit != 0 {
-		cases = append(cases, makeCase(unattributedCase, []string{s}))
+	// Unheaded continuation output (a line no "# <import path>" header claimed)
+	// belongs to the previous attributed line's package: one broken package is
+	// one failing case, not two.
+	leftover := strings.TrimSpace(sections.byName[""])
+	if leftover != "" && exit != 0 {
+		attached := false
+		for i := len(cases) - 1; i >= 0; i-- {
+			if cases[i].Failure != nil {
+				cases[i].Failure.Text = strings.TrimSpace(cases[i].Failure.Text + "\n" + leftover)
+				attached = true
+				break
+			}
+		}
+		if !attached {
+			cases = append(cases, makeCase(unattributedCase, []string{leftover}))
+		}
 	}
 	if exit != 0 && !anyFailed(cases) {
 		cases = append(cases, makeCase(unattributedCase, []string{fmt.Sprintf("go %s exited with status %d and named no package", k.Sub, exit)}))

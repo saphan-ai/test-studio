@@ -168,6 +168,71 @@ func TestRunnerThatCannotRunExitsTwoNamesWhyAndStillLeavesAReport(t *testing.T) 
 	}
 }
 
+func TestOneBrokenPackageReportsOneFailingCase(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name       string
+		kind       Kind
+		files      map[string]string
+		patterns   []string
+		wantFailed string // the one case expected to fail
+		wantTests  int
+	}{
+		{
+			name: "import-missing",
+			kind: Build,
+			files: map[string]string{
+				"ok/ok.go": okPackage,
+				"bad/bad.go": `package bad
+
+import "example.invalid/nosuch"
+
+var X = 1
+`,
+			},
+			wantFailed: "example.invalid/fx/bad",
+			wantTests:  2,
+		},
+		{
+			name: "nosuch-pattern",
+			kind: Build,
+			files: map[string]string{
+				"ok/ok.go": okPackage,
+				"bad/bad.go": `package bad
+
+var X int = "not an int"
+`,
+			},
+			patterns:   []string{"./nonexistent"},
+			wantFailed: "./nonexistent",
+			wantTests:  1,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := writeModule(t, tc.files)
+			var stderr bytes.Buffer
+			if code := Run(tc.kind, dir, tc.patterns, &stderr); code != ExitFail {
+				t.Fatalf("exit %d, want 1; stderr: %s", code, stderr.String())
+			}
+			s := readSuite(t, dir, tc.kind.ReportName())
+			var failed []string
+			for _, c := range s.Cases {
+				if c.Failure != nil {
+					failed = append(failed, c.Name)
+				}
+			}
+			if len(failed) != 1 || failed[0] != tc.wantFailed {
+				t.Fatalf("failed cases = %v, want exactly one: %s", failed, tc.wantFailed)
+			}
+			if s.Failures != 1 || s.Tests != tc.wantTests {
+				t.Fatalf("suite counts tests=%d failures=%d, want %d and 1", s.Tests, s.Failures, tc.wantTests)
+			}
+		})
+	}
+}
+
 func TestBuiltBinariesExitWithTheContractCodes(t *testing.T) {
 	t.Parallel()
 	broken := writeModule(t, map[string]string{"ok/ok.go": okPackage, "bad/bad.go": brokenPackage})
