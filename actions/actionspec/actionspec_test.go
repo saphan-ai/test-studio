@@ -115,6 +115,17 @@ func TestEachFieldOutsideTheNarrowingIsRefusedByName(t *testing.T) {
 		{"an author key", func(s string) string { return "author: someone\n" + s }, CodeUnknownTopLevelKey, "author"},
 
 		{"a second YAML document", func(s string) string { return s + "---\nfoo: bar\n" }, CodeNotAMapping, "document"},
+		{"an extra step key", replace("      shell: saphan-proc\n", "      shell: saphan-proc\n      label: build\n"), CodeStepKey, "label"},
+		{"an extra output key", replace("    value: go-build.junit.xml\n", "    value: go-build.junit.xml\n    valueFrom: x\n"), CodeOutputKey, "outputs.junit.valueFrom"},
+		{"an extra runs key", replace("  using: composite\n", "  using: composite\n  version: \"1\"\n"), CodeRunsKey, "runs.version"},
+		{"an unsupported expression", replace("run: go-build ${{ inputs.packages }}", "run: go-build ${{ inputs.packages + 1 }}"), CodeRunExpression, "run"},
+		{"a step with no run", replace("- run: go-build ${{ inputs.packages }}\n      shell: saphan-proc\n", "- shell: saphan-proc\n"), CodeStepRunMissing, "runs.steps[0].run"},
+		{"a yaml alias", func(s string) string {
+			s = replace("name: go-build\n", "name: &n go-build\n")(s)
+			return replace("description: Compile every Go package and report one JUnit case per package.\n", "description: *n\n")(s)
+		}, CodeAlias, "description"},
+		{"a file that is not YAML", replace("description: Compile every Go package and report one JUnit case per package.\n", "description: \"never closed\n"), CodeYAMLSyntax, "document"},
+		{"a name that is not a string", replace("name: go-build\n", "name: 42\n"), CodeSchema, "name"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
