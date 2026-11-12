@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/saphan-ai/test-studio/conformance/junit"
 )
 
 // junitFileName is the result file the import profile writes and then reads.
@@ -18,28 +20,12 @@ const junitFileName = "junit.xml"
 // The JUnit XML shape both the writer and the reader know: a testsuite of testcase elements, each
 // with a time in seconds and, when it did not pass, one of failure, error or skipped. The reader
 // takes a testsuites or a testsuite root and every testcase beneath it, in document order.
-type junitSuite struct {
-	XMLName  xml.Name    `xml:"testsuite"`
-	Name     string      `xml:"name,attr"`
-	Tests    int         `xml:"tests,attr"`
-	Failures int         `xml:"failures,attr"`
-	Errors   int         `xml:"errors,attr"`
-	Skipped  int         `xml:"skipped,attr"`
-	Cases    []junitCase `xml:"testcase"`
-}
-
-type junitCase struct {
-	Name    string        `xml:"name,attr"`
-	Time    string        `xml:"time,attr"`
-	Failure *junitProblem `xml:"failure"`
-	Error   *junitProblem `xml:"error"`
-	Skipped *junitProblem `xml:"skipped"`
-}
-
-type junitProblem struct {
-	Message string `xml:"message,attr,omitempty"`
-	Text    string `xml:",chardata"`
-}
+// The model itself lives in the junit package, which the catalogue actions' runners share.
+type (
+	junitSuite   = junit.Suite
+	junitCase    = junit.Case
+	junitProblem = junit.Problem
+)
 
 // runAndImport runs the project's items, writes a JUnit XML file of their outcomes and durations,
 // and reads the items back from that file. What comes back is all an import run knows of the
@@ -94,11 +80,7 @@ func writeJUnit(path, project string, items []Item) error {
 		}
 		s.Cases = append(s.Cases, c)
 	}
-	doc, err := xml.MarshalIndent(s, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, append([]byte(xml.Header), append(doc, '\n')...), 0o600)
+	return junit.Write(path, s)
 }
 
 // readJUnit reads every testcase of a JUnit XML file, in order, and returns the items with the
