@@ -1,0 +1,11 @@
+file: github-action.schema.json
+source: https://www.schemastore.org/github-action.json
+note: the former address https://json.schemastore.org/github-action.json answers 301 to the source above
+draft: http://json-schema.org/draft-07/schema#
+licence: Apache-2.0 (SchemaStore)
+bytes: 31255
+sha256: 224326cc5a334bdb97b56b6fc320cd4381ba7d61b477b425ed506e6a420b52ba
+fetched: 2026-11-12
+digest_measured_by: the dispatching master, in place on its own host, 2026-11-12 (this file was not hashed by the leg that vendored it)
+copy_check: byte-identical to the fetched file (diff exit 0, 31255 bytes)
+rule: the validator never fetches the schema; it reads this vendored copy, embedded in the binary
