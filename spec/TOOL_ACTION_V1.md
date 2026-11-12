@@ -114,6 +114,7 @@ Every refusal names a code, the key and the file: `<file>: refused <code> at <ke
 | `output-key-outside-contract` | an output key beyond `description`, `value` |
 | `junit-output-missing` | no `outputs.junit` |
 | `junit-value-not-literal` | `outputs.junit.value` missing, containing `${{`, absolute or containing `..` |
+| `junit-value-not-the-report-path` | `outputs.junit.value` other than exactly `<id>.junit.xml`, the path the runner writes for the JUnit report |
 | `runs-key-outside-contract` | a `runs` key beyond `using` and `steps` |
 | `runs-using-not-composite` | `runs.using` other than `composite`, for example `node20` or `docker` |
 | `runs-uses` | a `uses:` in `runs` or in a step |
@@ -126,6 +127,7 @@ Every refusal names a code, the key and the file: `<file>: refused <code> at <ke
 | `run-substitution-inside-token` | a `${{ }}` that shares its token with other text, such as `--pkg=${{ inputs.packages }}` |
 | `run-expression-unsupported` | a `${{ }}` that is not `inputs.<name>` |
 | `run-undeclared-input` | `inputs.<name>` for an input the action does not declare |
+| `run-empty-token` | an empty quoted token `""`; the engine would pass an empty argv word and exit 2 |
 | `run-runner-id-mismatch` | token 0 is not the action's directory name |
 
 Each refusal has a test that mutates exactly the field it names in an otherwise admitted file and requires the
