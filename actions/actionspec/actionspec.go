@@ -8,6 +8,7 @@ import (
 	"bytes"
 	_ "embed" // the vendored schema is embedded in the binary
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,29 +35,31 @@ const JunitOutput = "junit"
 
 // The refusal codes. A code is the name a refusal is known by.
 const (
-	CodeYAMLSyntax             = "yaml-syntax"
-	CodeNotAMapping            = "not-a-mapping"
-	CodeDuplicateKey           = "duplicate-key"
-	CodeAlias                  = "yaml-alias"
-	CodeSchema                 = "schema-violation"
-	CodeUnknownTopLevelKey     = "unknown-top-level-key"
-	CodeInputKey               = "input-key-outside-contract"
-	CodeOutputKey              = "output-key-outside-contract"
-	CodeJunitOutputMissing     = "junit-output-missing"
-	CodeJunitValueNotLiteral   = "junit-value-not-literal"
-	CodeRunsKey                = "runs-key-outside-contract"
-	CodeRunsUsing              = "runs-using-not-composite"
-	CodeRunsUses               = "runs-uses"
-	CodeStepCount              = "runs-steps-count"
-	CodeStepKey                = "step-key-outside-contract"
-	CodeStepShell              = "step-shell-not-saphan-proc"
-	CodeStepRunMissing         = "step-run-missing"
-	CodeRunUnterminated        = "run-unterminated"
-	CodeRunMetacharacter       = "run-shell-metacharacter"
-	CodeRunSubstitutionInToken = "run-substitution-inside-token"
-	CodeRunExpression          = "run-expression-unsupported"
-	CodeRunUndeclaredInput     = "run-undeclared-input"
-	CodeRunnerID               = "run-runner-id-mismatch"
+	CodeYAMLSyntax                 = "yaml-syntax"
+	CodeNotAMapping                = "not-a-mapping"
+	CodeDuplicateKey               = "duplicate-key"
+	CodeAlias                      = "yaml-alias"
+	CodeSchema                     = "schema-violation"
+	CodeUnknownTopLevelKey         = "unknown-top-level-key"
+	CodeInputKey                   = "input-key-outside-contract"
+	CodeOutputKey                  = "output-key-outside-contract"
+	CodeJunitOutputMissing         = "junit-output-missing"
+	CodeJunitValueNotLiteral       = "junit-value-not-literal"
+	CodeJunitValueNotTheReportPath = "junit-value-not-the-report-path"
+	CodeRunsKey                    = "runs-key-outside-contract"
+	CodeRunsUsing                  = "runs-using-not-composite"
+	CodeRunsUses                   = "runs-uses"
+	CodeStepCount                  = "runs-steps-count"
+	CodeStepKey                    = "step-key-outside-contract"
+	CodeStepShell                  = "step-shell-not-saphan-proc"
+	CodeStepRunMissing             = "step-run-missing"
+	CodeRunUnterminated            = "run-unterminated"
+	CodeRunMetacharacter           = "run-shell-metacharacter"
+	CodeRunSubstitutionInToken     = "run-substitution-inside-token"
+	CodeRunExpression              = "run-expression-unsupported"
+	CodeRunUndeclaredInput         = "run-undeclared-input"
+	CodeRunnerID                   = "run-runner-id-mismatch"
+	CodeRunEmptyToken              = "run-empty-token"
 )
 
 // Refusal is one thing the validator refused: the file, the refusal's name, the key it is about
@@ -110,13 +113,14 @@ func Validate(path string) ([]Refusal, error) {
 		return nil, fmt.Errorf("cannot compile the vendored schema: %w", err)
 	}
 	v := &validation{file: path, id: filepath.Base(filepath.Dir(abs))}
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
 	var root yaml.Node
-	if err := yaml.Unmarshal(raw, &root); err != nil {
+	if err := dec.Decode(&root); err != nil {
 		v.refuse(CodeYAMLSyntax, "document", "the file is not YAML: %v", err)
 		return v.refusals, nil
 	}
-	if root.Kind != yaml.DocumentNode || len(root.Content) != 1 {
-		v.refuse(CodeNotAMapping, "document", "the file holds no YAML document")
+	if err := dec.Decode(&yaml.Node{}); err != io.EOF {
+		v.refuse(CodeNotAMapping, "document", "the file holds more than one YAML document; the contract admits one")
 		return v.refusals, nil
 	}
 	doc := v.toAny(root.Content[0], "")
@@ -295,6 +299,8 @@ func (v *validation) narrowOutputs(x any) {
 		v.refuse(CodeJunitValueNotLiteral, "outputs.junit.value", "outputs.junit.value %q is not a literal path; write the report's relative path out", val)
 	case filepath.IsAbs(val) || strings.HasPrefix(val, "/") || hasDotDot(val):
 		v.refuse(CodeJunitValueNotLiteral, "outputs.junit.value", "outputs.junit.value %q is not a path relative to the job's work directory", val)
+	case val != v.id+".junit.xml":
+		v.refuse(CodeJunitValueNotTheReportPath, "outputs.junit.value", "outputs.junit.value %q is not the report path; the runner writes %q", val, v.id+".junit.xml")
 	}
 }
 
@@ -369,7 +375,15 @@ var (
 )
 
 // narrowRun checks one run string the way the engine will split it.
+// The tokenizer runs first: a ${{ without a closing }} (or an unclosed quote)
+// is run-unterminated, ahead of the metacharacter scan, so an unterminated
+// substitution is refused as run-unterminated as spec/TOOL_ACTION_V1.md says.
 func (v *validation) narrowRun(at, run string, declared map[string]bool) {
+	toks, err := tokenize(run)
+	if err != nil {
+		v.refuse(CodeRunUnterminated, at, "%v", err)
+		return
+	}
 	masked := exprPattern.ReplaceAllString(run, " ")
 	for _, r := range masked {
 		if strings.ContainsRune(forbidden, r) {
@@ -377,10 +391,11 @@ func (v *validation) narrowRun(at, run string, declared map[string]bool) {
 			return
 		}
 	}
-	toks, err := tokenize(run)
-	if err != nil {
-		v.refuse(CodeRunUnterminated, at, "%v", err)
-		return
+	for _, t := range toks {
+		if t.text == "" {
+			v.refuse(CodeRunEmptyToken, at, "run has an empty token; the engine would pass an empty argv word; remove the empty quotes")
+			return
+		}
 	}
 	if len(toks) == 0 {
 		v.refuse(CodeRunnerID, at, "run is empty; token 0 must be the runner id %q", v.id)

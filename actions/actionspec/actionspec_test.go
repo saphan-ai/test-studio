@@ -98,13 +98,23 @@ func TestEachFieldOutsideTheNarrowingIsRefusedByName(t *testing.T) {
 		{"outputs.junit removed", replace("  junit:\n    description: Path of the JUnit report, relative to the job's work directory.\n    value: go-build.junit.xml\n", "  report:\n    description: x\n    value: go-build.junit.xml\n"), CodeJunitOutputMissing, "outputs.junit"},
 		{"runs.using node20", replace("using: composite", "using: node20"), CodeRunsUsing, "using"},
 		{"a pipe in run", replace("run: go-build ${{ inputs.packages }}", "run: go-build ${{ inputs.packages }} | tee x"), CodeRunMetacharacter, "run"},
+		{"an unterminated substitution", replace("run: go-build ${{ inputs.packages }}", "run: go-build ${{ inputs.packages"), CodeRunUnterminated, "run"},
+		{"an empty quoted token", replace("run: go-build ${{ inputs.packages }}", "run: go-build \"\" ${{ inputs.packages }}"), CodeRunEmptyToken, "run"},
+
 		{"a substitution inside a token", replace("run: go-build ${{ inputs.packages }}", "run: go-build --pkg=${{ inputs.packages }}"), CodeRunSubstitutionInToken, "run"},
 		{"an undeclared input", replace("inputs.packages }}", "inputs.nosuch }}"), CodeRunUndeclaredInput, "nosuch"},
 		{"a uses step", replace("- run: go-build ${{ inputs.packages }}\n      shell: saphan-proc", "- uses: actions/checkout@v4"), CodeRunsUses, "uses"},
 		{"a junit value that is not literal", replace("value: go-build.junit.xml", "value: ${{ inputs.packages }}"), CodeJunitValueNotLiteral, "outputs.junit.value"},
+		{"a junit value in a subdir", replace("value: go-build.junit.xml", "value: sub/go-build.junit.xml"), CodeJunitValueNotTheReportPath, "outputs.junit.value"},
+		{"a junit value of another name", replace("value: go-build.junit.xml", "value: report.xml"), CodeJunitValueNotTheReportPath, "outputs.junit.value"},
+		{"a junit value with a dot", replace("value: go-build.junit.xml", "value: ./go-build.junit.xml"), CodeJunitValueNotTheReportPath, "outputs.junit.value"},
+		{"a junit value left blank", replace("value: go-build.junit.xml", "value: \"\""), CodeJunitValueNotLiteral, "outputs.junit.value"},
+
 		{"an input key outside the contract", replace("    required: false\n", "    required: false\n    deprecationMessage: no\n"), CodeInputKey, "deprecationMessage"},
 		{"a runner id that is not the action's directory", replace("run: go-build", "run: go-other"), CodeRunnerID, "go-other"},
 		{"an author key", func(s string) string { return "author: someone\n" + s }, CodeUnknownTopLevelKey, "author"},
+
+		{"a second YAML document", func(s string) string { return s + "---\nfoo: bar\n" }, CodeNotAMapping, "document"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
