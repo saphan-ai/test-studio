@@ -63,7 +63,10 @@ var (
 // ReportName is the file the runner writes in the work directory.
 func (k Kind) ReportName() string { return k.ID + ".junit.xml" }
 
-// listed is the part of `go list -json` the runner reads.
+// listed is the part of `go list -json` the runner reads. A package whose imports cannot be
+// resolved is listed with DepsErrors even when its top-level Error is nil; such a package is a
+// load error the go command never compiles, so the runner reports it from go list output and
+// never hands it to the go subcommand.
 type listed struct {
 	ImportPath   string
 	Dir          string
@@ -72,6 +75,11 @@ type listed struct {
 	TestGoFiles  []string
 	XTestGoFiles []string
 	Error        *struct{ Err string }
+	DepsErrors   []struct {
+		ImportStack []string
+		Pos         string
+		Err         string
+	}
 }
 
 func (k Kind) subject(p listed) bool {
@@ -126,7 +134,10 @@ func runnerFailure(k Kind, workDir string, cause error, stderr io.Writer) int {
 	return ExitRunner
 }
 
-// check lists the packages, runs the go subcommand once over them and returns one case each.
+// check lists the packages, runs the go subcommand once over the packages go list could load
+// and returns one case each. Packages with a load error (top-level Error or DepsErrors) were
+// never reached by the go subcommand: they are reported as failing from go list output, so a
+// case is pass only if the go command checked that package and reported nothing for it.
 func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 	for _, p := range patterns {
 		if p == "" || strings.HasPrefix(p, "-") || strings.ContainsRune(p, 0) {
@@ -137,28 +148,47 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 	if err != nil {
 		return nil, err
 	}
-	var subjects []listed
+	var subjects, unreachable []listed
 	for _, p := range pkgs {
-		if k.subject(p) {
-			subjects = append(subjects, p)
+		if !k.subject(p) {
+			continue
 		}
+		if p.Error != nil || len(p.DepsErrors) > 0 {
+			unreachable = append(unreachable, p)
+			continue
+		}
+		subjects = append(subjects, p)
 	}
-	if len(subjects) == 0 {
+	if len(subjects) == 0 && len(unreachable) == 0 {
 		return nil, fmt.Errorf("no package to check matched %s", strings.Join(patterns, " "))
 	}
-	out, exit, err := goRun(workDir, append([]string{k.Sub, "--"}, patterns...), true)
-	if err != nil {
-		return nil, err
+	var out []byte
+	var exit int
+	if len(subjects) > 0 {
+		dirs := make([]string, 0, len(subjects))
+		for _, p := range subjects {
+			dirs = append(dirs, p.Dir)
+		}
+		out, exit, err = goRun(workDir, append([]string{k.Sub, "--"}, dirs...), true)
+		if err != nil {
+			return nil, err
+		}
 	}
 	sections := splitSections(out)
 	sections.attributeByFile(workDir, subjects)
 	var cases []junit.Case
 	seen := map[string]bool{}
-	for _, p := range subjects {
+	all := make([]listed, 0, len(subjects)+len(unreachable))
+	all = append(all, subjects...)
+	all = append(all, unreachable...)
+	for _, p := range all {
 		seen[p.ImportPath] = true
 		var text []string
 		if p.Error != nil {
 			text = append(text, p.Error.Err)
+		}
+		for _, e := range p.DepsErrors {
+			text = append(text, e.Err)
 		}
 		if s, ok := sections.byName[p.ImportPath]; ok {
 			text = append(text, s)
@@ -166,7 +196,7 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 		cases = append(cases, makeCase(p.ImportPath, text))
 	}
 	for _, name := range sections.order {
-		if !seen[name] && name != "" { // a package outside the patterns that failed
+		if !seen[name] && name != "" { // a package outside the subjects that failed
 			cases = append(cases, makeCase(name, []string{sections.byName[name]}))
 		}
 	}
@@ -271,7 +301,9 @@ func realPath(p string) string {
 }
 
 // splitSections cuts go build or go vet output at its "# <import path>" headers. Text before the
-// first header is filed under the empty name.
+// first header is filed under the empty name. Header forms go vet uses -- `# [<path>]` and
+// `# <path> [<path>.test]` -- are normalised to the package's import path so the error they head
+// is filed under one case per package.
 func splitSections(out []byte) sectionSet {
 	set := sectionSet{byName: map[string]string{}}
 	cur := ""
