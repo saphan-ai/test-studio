@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -98,6 +99,9 @@ func Run(k Kind, workDir string, patterns []string, stderr io.Writer) int {
 	if len(patterns) == 0 {
 		patterns = []string{DefaultPattern}
 	}
+	if flag := workSkippingGoflag(workDir); flag != "" {
+		return runnerFailure(k, workDir, fmt.Errorf("go: GOFLAGS carries %q, which makes the go command skip work while exiting 0; the runner refuses to run it", flag), stderr)
+	}
 	cases, err := check(k, workDir, patterns)
 	if err != nil {
 		return runnerFailure(k, workDir, err, stderr)
@@ -179,18 +183,22 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 		for _, p := range subjects {
 			dirs = append(dirs, p.Dir)
 		}
-		_, exit, err := goRun(workDir, append([]string{k.Sub, "--"}, dirs...), true)
+		_, _, exit, err := goRun(workDir, append([]string{k.Sub, "--"}, dirs...), true)
 		if err != nil {
 			return nil, err
 		}
 		combinedFailed = exit != 0
 	}
-	// results is keyed by the normalised case name: test-variant spellings of one package share
-	// the owning package's case. order records first appearance.
+	// results is keyed by the case name: go list's ImportPath, exactly as printed. Test-variant
+	// spellings never share a case: go list lists each package under its own path, and a package
+	// whose path ends in _test is a real subject under its own path, never folded onto the path
+	// without the suffix. go-vet headers (# <p>, # [<p>.test], # <p>_test [<p>.test]) never
+	// name a case: a test variant reaches its owning package only through go list output, never
+	// by editing a bare path. order records first appearance.
 	results := map[string]string{}
 	order := []string{}
 	add := func(p listed, text string) {
-		key := normPath(p.ImportPath)
+		key := p.ImportPath
 		if _, ok := results[key]; !ok {
 			order = append(order, key)
 			results[key] = ""
@@ -206,7 +214,7 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 	for _, p := range subjects {
 		var text string
 		if combinedFailed {
-			out, exit, err := goRun(p.Dir, []string{k.Sub, "."}, true)
+			out, _, exit, err := goRun(p.Dir, []string{k.Sub, "."}, true)
 			if err != nil {
 				return nil, err
 			}
@@ -233,14 +241,6 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 	return cases, nil
 }
 
-// normPath normalises a test-variant spelling of a package to its owning package's import path:
-// the go command names a package's external test variant <path>_test (and prints # <path>_test
-// [<path>.test] headers). Such a package is never a case of its own: its findings belong to the
-// case named by the owning package's import path.
-func normPath(p string) string {
-	return strings.TrimSuffix(p, "_test")
-}
-
 func makeCase(name string, text []string) junit.Case {
 	c := junit.Case{Name: name, Time: caseTime}
 	joined := strings.TrimSpace(strings.Join(text, "\n"))
@@ -257,7 +257,7 @@ func makeCase(name string, text []string) junit.Case {
 
 // list runs `go list -e -json` and decodes the stream of package objects.
 func list(workDir string, patterns []string) ([]listed, error) {
-	out, exit, err := goRun(workDir, append([]string{"list", "-e", "-json", "--"}, patterns...), false)
+	out, listStderr, exit, err := goRun(workDir, append([]string{"list", "-e", "-json", "--"}, patterns...), false)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func list(workDir string, patterns []string) ([]listed, error) {
 		pkgs = append(pkgs, p)
 	}
 	if exit != 0 && len(pkgs) == 0 {
-		return nil, fmt.Errorf("go list could not list %s: %s", strings.Join(patterns, " "), firstLine(out))
+		return nil, fmt.Errorf("go list could not list %s: %s", strings.Join(patterns, " "), firstLine(listStderr))
 	}
 	return pkgs, nil
 }
@@ -285,27 +285,64 @@ func firstLine(b []byte) string {
 
 // goRun runs the go command in dir and returns its combined output and exit code. An error is
 // returned only when the command could not be run to an exit: not found, not started, timed out.
-func goRun(dir string, args []string, combined bool) ([]byte, int, error) {
+func goRun(dir string, args []string, combined bool) ([]byte, []byte, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), GoTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = dir
-	var out []byte
-	var err error
-	if combined {
-		out, err = cmd.CombinedOutput()
-	} else {
-		out, err = cmd.Output() // stdout only: a warning on stderr must not corrupt the JSON stream
-	}
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+	err := cmd.Run()
 	var exit *exec.ExitError
 	switch {
 	case err == nil:
-		return out, 0, nil
+		out, serr := stdoutBuf.Bytes(), stderrBuf.Bytes()
+		if combined {
+			out = append(out, serr...)
+			serr = nil
+		}
+		return out, serr, 0, nil
 	case ctx.Err() != nil:
-		return nil, 0, fmt.Errorf("go %s did not finish within %s", args[0], GoTimeout)
+		return nil, nil, 0, fmt.Errorf("go %s did not finish within %s", args[0], GoTimeout)
 	case errors.As(err, &exit):
-		return out, exit.ExitCode(), nil
+		out, serr := stdoutBuf.Bytes(), stderrBuf.Bytes()
+		if combined {
+			out = append(out, serr...)
+			serr = nil
+		}
+		return out, serr, exit.ExitCode(), nil
 	default:
-		return nil, 0, fmt.Errorf("cannot start go: %w", err)
+		return nil, nil, 0, fmt.Errorf("cannot start go: %w", err)
 	}
+}
+
+// goEnvGoflags reports the effective GOFLAGS: `go env GOFLAGS`, which also reports values
+// saved with `go env -w`, falling back to the process environment when go itself cannot run
+// (a work-skipping GOFLAGS breaks go env as well).
+func goEnvGoflags(workDir string) string {
+	cmd := exec.Command("go", "env", "GOFLAGS")
+	cmd.Dir = workDir
+	out, err := cmd.Output()
+	if err != nil {
+		return os.Getenv("GOFLAGS")
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// workSkippingGoflag returns a flag in the effective GOFLAGS that makes the go command skip
+// work while still exiting 0, or "" when none is set. The set is derived from the pinned
+// toolchain's own documentation: `go help build` documents -n as "print the commands but do
+// not run them" -- it exits 0 without compiling anything, which is exactly B-2. Other flags
+// (for example -toolexec) may change how tools run or fail on their own, but they do not
+// silently skip the work, so they are not refused here; a failed go list names its cause
+// instead (see list).
+func workSkippingGoflag(workDir string) string {
+	for _, tok := range strings.Fields(goEnvGoflags(workDir)) {
+		tok = strings.Trim(tok, `"'`)
+		if tok == "-n" {
+			return tok
+		}
+	}
+	return ""
 }

@@ -2,7 +2,7 @@ schema: tool-invocation/v1
 id: go-vet
 ecosystem: go
 version: "1.0.0"
-pin: {asset: go-vet, sha256: "41b9b8efda64cf242be522369dc993de7e431a6dd2351d3af85a0d1e521635bf"}
+pin: {asset: go-vet, sha256: "96fa94e69de5c1e1b0f7bf7eaf0c16f91520b7e86b812718418d3d81759e2ccb"}
 licence_class: osi
 command: [go-vet, ./...]
 inputs: ["."]
