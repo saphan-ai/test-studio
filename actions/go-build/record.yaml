@@ -2,7 +2,7 @@ schema: tool-invocation/v1
 id: go-build
 ecosystem: go
 version: "1.0.0"
-pin: {asset: go-build, sha256: "cac1406cab8a059923a84fe6db07f88dd8cf78a1657b8781e28c88b28a0cc6d2"}
+pin: {asset: go-build, sha256: "9c45f662fbee4434ce0c1bce35957b0537147a3462797293c37824cf67dc1552"}
 licence_class: osi
 command: [go-build, ./...]
 inputs: ["."]
