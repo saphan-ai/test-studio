@@ -54,7 +54,7 @@ declared input. The validator enforces the same reading.
 
 A runner is a program that takes the arguments the run string gives it and writes its JUnit report in the work
 directory, at the path `outputs.junit.value` names. The report is a `testsuite` of `testcase` elements, one per Go
-package checked; a failed package's case carries the compiler or vet output as its failure text. A case is `pass` only on positive evidence that the go command checked that package and reported nothing for it; every package it did not check (load error, dependency failed, not reached) is a failing case named by its import path, never omitted and never pass. A runner leaves the
+package checked; a failed package's case carries the compiler or vet output as its failure text. A case is `pass` only on positive evidence that the go command checked that package and reported nothing for it; every package it did not check (load error, dependency failed, not reached) is a failing case named by its import path, never omitted and never pass. Cases are named by `go list`'s ImportPath only -- never by stripping `_test` and never from a go-vet header -- and a work-skipping flag such as `GOFLAGS=-n` (go prints the commands but does not run them) can never yield `pass`: the runner refuses it by name and exits 2. A runner leaves the
 report whatever happens: when it cannot run, the report holds one error case named `runner`.
 
 | exit code | meaning |
