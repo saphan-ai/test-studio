@@ -17,7 +17,7 @@ import (
 func writeModule(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
-	all := map[string]string{"go.mod": "module example.invalid/fx\n\ngo 1.21\n"}
+	all := map[string]string{"go.mod": "module example.invalid/fx\n\ngo 1.26\n"}
 	for name, body := range files {
 		all[name] = body
 	}
@@ -63,6 +63,29 @@ func outcomes(s junit.Suite) map[string]bool {
 	return m
 }
 
+// assertOneCasePerSubject asserts the report holds one case per subject package, that every case
+// is named by an import path (no header test-variant forms leak into case names) and that the
+// counts match the number of subject packages.
+func assertOneCasePerSubject(t *testing.T, s junit.Suite, subjects int) {
+	t.Helper()
+	if len(s.Cases) != subjects {
+		t.Fatalf("cases = %v, want one case per subject package (%d)", caseNames(s), subjects)
+	}
+	for _, c := range s.Cases {
+		if strings.Contains(c.Name, "[") || strings.HasSuffix(c.Name, "_test") || strings.Contains(c.Name, ".test") || c.Name == "(output not attributed to a package)" {
+			t.Fatalf("a header-derived or phantom case was reported: %q", c.Name)
+		}
+	}
+}
+
+func caseNames(s junit.Suite) []string {
+	names := make([]string, 0, len(s.Cases))
+	for _, c := range s.Cases {
+		names = append(names, c.Name)
+	}
+	return names
+}
+
 func TestCleanModuleEveryPackagePasses(t *testing.T) {
 	t.Parallel()
 	for _, k := range []Kind{Build, Vet} {
@@ -91,6 +114,7 @@ func TestBuildFailsExactlyThePackageThatDoesNotCompile(t *testing.T) {
 	}
 	s := readSuite(t, dir, "go-build.junit.xml")
 	got := outcomes(s)
+	assertOneCasePerSubject(t, s, 2)
 	if len(got) != 2 || !got["example.invalid/fx/bad"] || got["example.invalid/fx/ok"] {
 		t.Fatalf("cases = %v, want only example.invalid/fx/bad failed", got)
 	}
@@ -113,6 +137,7 @@ func TestVetFailsExactlyThePackageWithAFindingAndBuildStillPasses(t *testing.T) 
 	}
 	s := readSuite(t, dir, "go-vet.junit.xml")
 	got := outcomes(s)
+	assertOneCasePerSubject(t, s, 2)
 	if len(got) != 2 || !got["example.invalid/fx/noisy"] || got["example.invalid/fx/ok"] {
 		t.Fatalf("cases = %v, want only example.invalid/fx/noisy failed", got)
 	}
@@ -293,6 +318,252 @@ func TestTheRecordedFixturesGiveTheOutcomeTheirRecordsExpect(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLoadErrorDoesNotMaskABrokenPackage reproduces B1: a module whose a/a.go imports
+// a missing module and whose b/b.go does not compile. `go build ./...` stops at the
+// load error and never compiles b, so the runner must not report b as pass. Both
+// packages fail, one case each, named by import path, with no phantom case.
+func TestLoadErrorDoesNotMaskABrokenPackage(t *testing.T) {
+	t.Parallel()
+	for _, k := range []Kind{Build, Vet} {
+		t.Run(k.ID, func(t *testing.T) {
+			t.Parallel()
+			dir := writeModule(t, map[string]string{
+				"a/a.go": `package a
+
+import "example.invalid/nosuch"
+
+`,
+				"b/b.go": `package b
+
+var X int = "s"
+
+`,
+			})
+			var stderr bytes.Buffer
+			if code := Run(k, dir, nil, &stderr); code != ExitFail {
+				t.Fatalf("exit %d on two broken packages, want 1; stderr: %s", code, stderr.String())
+			}
+			s := readSuite(t, dir, k.ReportName())
+			got := outcomes(s)
+			want := map[string]bool{"example.invalid/fx/a": true, "example.invalid/fx/b": true}
+			assertOneCasePerSubject(t, s, 2)
+			if len(got) != len(want) {
+				t.Fatalf("cases = %v, want exactly the two packages, both failed: %v", got, want)
+			}
+			for name, failed := range want {
+				if got[name] != failed {
+					t.Fatalf("case %q failed = %v, want %v", name, got[name], failed)
+				}
+			}
+			if s.Failures != 2 || s.Tests != 2 {
+				t.Fatalf("suite counts tests=%d failures=%d, want 2 and 2", s.Tests, s.Failures)
+			}
+		})
+	}
+}
+
+// TestVetTestFileCompileErrorNamesOneCaseByPackage reproduces B2: a _test.go that does
+// not compile under go-vet. go vet prints "# <path>" and "# [<path>]" headers for the
+// test variant; the runner must file the error under the package's import path: exactly
+// one failing case, named by the package, no phantom [<path>] case.
+func TestVetTestFileCompileErrorNamesOneCaseByPackage(t *testing.T) {
+	t.Parallel()
+	dir := writeModule(t, map[string]string{
+		"t/t.go": `package t
+
+func Add(a, b int) int { return a + b }
+
+`,
+		"t/t_test.go": `package t
+
+var X int = "s"
+
+`,
+	})
+	var stderr bytes.Buffer
+	if code := Run(Vet, dir, nil, &stderr); code != ExitFail {
+		t.Fatalf("vet exit %d on a broken test file, want 1; stderr: %s", code, stderr.String())
+	}
+	s := readSuite(t, dir, "go-vet.junit.xml")
+	got := outcomes(s)
+	assertOneCasePerSubject(t, s, 1)
+	if len(got) != 1 || !got["example.invalid/fx/t"] {
+		t.Fatalf("cases = %v, want exactly one failing case: example.invalid/fx/t", got)
+	}
+	if s.Failures != 1 || s.Tests != 1 {
+		t.Fatalf("suite counts tests=%d failures=%d, want 1 and 1", s.Tests, s.Failures)
+	}
+}
+
+// TestDependencySkippedPackageIsNotPassed reproduces N2: good imports bad, which does not
+// compile. The go command stops at bad and never checks good, so good must be a failing case
+// named example.invalid/fx/good, never pass, under both runners. The failure text says why:
+// the dependency failed and the package was not reached.
+func TestDependencySkippedPackageIsNotPassed(t *testing.T) {
+	t.Parallel()
+	files := map[string]string{
+		"bad/bad.go": `package bad
+
+var X int = "s"
+
+`,
+		"good/good.go": `package good
+
+import "example.invalid/fx/bad"
+
+var G = 1
+
+`,
+	}
+	for _, k := range []Kind{Build, Vet} {
+		t.Run(k.ID, func(t *testing.T) {
+			t.Parallel()
+			dir := writeModule(t, files)
+			var stderr bytes.Buffer
+			if code := Run(k, dir, nil, &stderr); code != ExitFail {
+				t.Fatalf("%s exit %d on a package importing a broken one, want 1; stderr: %s", k.ID, code, stderr.String())
+			}
+			s := readSuite(t, dir, k.ReportName())
+			got := outcomes(s)
+			assertOneCasePerSubject(t, s, 2)
+			want := map[string]bool{"example.invalid/fx/bad": true, "example.invalid/fx/good": true}
+			if len(got) != len(want) {
+				t.Fatalf("cases = %v, want both packages failed: %v", got, want)
+			}
+			for name, failed := range want {
+				if got[name] != failed {
+					t.Fatalf("case %q failed = %v, want %v", name, got[name], failed)
+				}
+			}
+			if s.Failures != 2 || s.Tests != 2 {
+				t.Fatalf("suite counts tests=%d failures=%d, want 2 and 2", s.Tests, s.Failures)
+			}
+			good := caseByName(s, "example.invalid/fx/good")
+			if good == nil || good.Failure == nil {
+				t.Fatalf("example.invalid/fx/good is not a failing case: %+v", good)
+			}
+			if !strings.Contains(good.Failure.Text, "bad") && !strings.Contains(good.Failure.Text, "not checked") {
+				t.Fatalf("the good case's failure text does not say the dependency failed: %q", good.Failure.Text)
+			}
+		})
+	}
+}
+
+// TestExternalTestCompileErrorFailsTheOwningPackage reproduces N1: package x ships x.go and a
+// separate package x_test (an external test of x) whose file does not compile. The go command
+// lists both packages and heads the error under x_test, so at base x passes and a phantom
+// x_test case is reported. The runner must fail exactly one case, named by the owning package's
+// import path (example.invalid/fx/x), and never report an x_test case: the test goes red when
+// the _test normalisation is removed. Both runners see it: go build compiles the x_test package
+// as a regular package, and go vet compiles its test variant.
+func TestExternalTestCompileErrorFailsTheOwningPackage(t *testing.T) {
+	t.Parallel()
+	dir := writeModule(t, map[string]string{
+		"x/x.go": `package x
+
+func Add(a, b int) int { return a + b }
+
+`,
+		"x_test/xtest.go": `package x_test
+
+var X int = "s"
+
+`,
+	})
+	for _, k := range []Kind{Build, Vet} {
+		t.Run(k.ID, func(t *testing.T) {
+			t.Parallel()
+			var stderr bytes.Buffer
+			if code := Run(k, dir, nil, &stderr); code != ExitFail {
+				t.Fatalf("%s exit %d on a broken external test package, want 1; stderr: %s", k.ID, code, stderr.String())
+			}
+			s := readSuite(t, dir, k.ReportName())
+			assertOneCasePerSubject(t, s, 1)
+			got := outcomes(s)
+			if len(got) != 1 || !got["example.invalid/fx/x"] {
+				t.Fatalf("cases = %v, want exactly one failing case: example.invalid/fx/x", got)
+			}
+			if s.Failures != 1 || s.Tests != 1 {
+				t.Fatalf("suite counts tests=%d failures=%d, want 1 and 1", s.Tests, s.Failures)
+			}
+			c := caseByName(s, "example.invalid/fx/x")
+			if c == nil || c.Failure == nil || !strings.Contains(c.Failure.Text, "xtest.go") {
+				t.Fatalf("the failing case does not carry the external-test error: %+v", c)
+			}
+		})
+	}
+}
+
+// TestPackageWithOnlyBuildConstrainedFileFailsByImportPath: a package whose only file is
+// excluded by a build constraint still yields one failing case named by its import path.
+// go list lists the file, so the package is a subject; the go command reports the
+// misplaced directive under its path and the runner fails it.
+func TestPackageWithOnlyBuildConstrainedFileFailsByImportPath(t *testing.T) {
+	t.Parallel()
+	for _, k := range []Kind{Build, Vet} {
+		t.Run(k.ID, func(t *testing.T) {
+			t.Parallel()
+			dir := writeModule(t, map[string]string{
+				"only/only.go": `package only
+
+//go:build ignore
+
+var Only = 1
+
+`,
+			})
+			var stderr bytes.Buffer
+			if code := Run(k, dir, nil, &stderr); code != ExitFail {
+				t.Fatalf("%s exit %d on a build-constrained-only package, want 1; stderr: %s", k.ID, code, stderr.String())
+			}
+			s := readSuite(t, dir, k.ReportName())
+			got := outcomes(s)
+			assertOneCasePerSubject(t, s, 1)
+			if len(got) != 1 || !got["example.invalid/fx/only"] {
+				t.Fatalf("cases = %v, want exactly one failing case: example.invalid/fx/only", got)
+			}
+			if s.Failures != 1 || s.Tests != 1 {
+				t.Fatalf("suite counts tests=%d failures=%d, want 1 and 1", s.Tests, s.Failures)
+			}
+		})
+	}
+}
+
+// TestEmptyModuleNoPackageCases: an empty module has zero subject packages, so the report
+// holds no package case and no phantom case; the runner itself reports nothing to check.
+func TestEmptyModuleNoPackageCases(t *testing.T) {
+	t.Parallel()
+	for _, k := range []Kind{Build, Vet} {
+		t.Run(k.ID, func(t *testing.T) {
+			t.Parallel()
+			dir := writeModule(t, map[string]string{})
+			var stderr bytes.Buffer
+			code := Run(k, dir, nil, &stderr)
+			if code != ExitRunner {
+				t.Fatalf("%s exit %d on an empty module, want %d; stderr: %s", k.ID, code, ExitRunner, stderr.String())
+			}
+			s := readSuite(t, dir, k.ReportName())
+			if s.Errors != 1 || len(s.Cases) != 1 || s.Cases[0].Name != "runner" || s.Cases[0].Error == nil {
+				t.Fatalf("an empty module leaves one runner error case, got %+v", s)
+			}
+			for _, c := range s.Cases {
+				if strings.Contains(c.Name, "[") || strings.HasSuffix(c.Name, "_test") || strings.Contains(c.Name, ".test") {
+					t.Fatalf("a phantom case was reported: %q", c.Name)
+				}
+			}
+		})
+	}
+}
+
+func caseByName(s junit.Suite, name string) *junit.Case {
+	for i := range s.Cases {
+		if s.Cases[i].Name == name {
+			return &s.Cases[i]
+		}
+	}
+	return nil
 }
 
 // copyTree copies the regular files of src into dst.

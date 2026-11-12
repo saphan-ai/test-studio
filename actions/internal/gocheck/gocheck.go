@@ -35,8 +35,6 @@ const (
 	MaxFailureText = 64 * 1024
 	// GoTimeout bounds one invocation of the go command.
 	GoTimeout = 15 * time.Minute
-	// unattributedCase names the case that holds failure output no package header claimed.
-	unattributedCase = "(output not attributed to a package)"
 	// runnerCase names the single error case of a report left by a runner that could not run.
 	runnerCase = "runner"
 	// caseTime is the time attribute of every case: the go command reports no per-package time.
@@ -134,10 +132,23 @@ func runnerFailure(k Kind, workDir string, cause error, stderr io.Writer) int {
 	return ExitRunner
 }
 
-// check lists the packages, runs the go subcommand once over the packages go list could load
-// and returns one case each. Packages with a load error (top-level Error or DepsErrors) were
-// never reached by the go subcommand: they are reported as failing from go list output, so a
-// case is pass only if the go command checked that package and reported nothing for it.
+// check lists the packages and returns one case per subject package. The default is not-pass: a
+// subject starts from "not checked" and becomes pass only when the go command's output positively
+// shows that package was checked and reported nothing for it. Every subject left not checked is a
+// failing case named by its import path, with a failure text that says why (load error, an error
+// the go command reported for the package, or that the go command stopped before reaching it).
+//
+// The go subcommand is run once over every load-clean subject. When it exits 0 it checked every
+// subject and reported nothing, so all subjects pass on that single positive evidence. When it
+// does not exit 0 it stops at the first failure and never reports on the rest, so each subject is
+// then run on its own: exit 0 is again positive evidence of a clean package, anything else is a
+// failure carrying that package's own go command output.
+//
+// Case names come from go list output only. Header forms the go command prints for test variants
+// (# <path>, # [<path>], # <path> [<path>.test], # <path>_test [<path>.test]) never name a case:
+// a package whose import path ends in _test is the external test variant of the package named
+// without the suffix, so its findings are folded onto the owning package's case and no _test
+// case is ever emitted.
 func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 	for _, p := range patterns {
 		if p == "" || strings.HasPrefix(p, "-") || strings.ContainsRune(p, 0) {
@@ -162,27 +173,50 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 	if len(subjects) == 0 && len(unreachable) == 0 {
 		return nil, fmt.Errorf("no package to check matched %s", strings.Join(patterns, " "))
 	}
-	var out []byte
-	var exit int
+	combinedFailed := false
 	if len(subjects) > 0 {
 		dirs := make([]string, 0, len(subjects))
 		for _, p := range subjects {
 			dirs = append(dirs, p.Dir)
 		}
-		out, exit, err = goRun(workDir, append([]string{k.Sub, "--"}, dirs...), true)
+		_, exit, err := goRun(workDir, append([]string{k.Sub, "--"}, dirs...), true)
 		if err != nil {
 			return nil, err
 		}
+		combinedFailed = exit != 0
 	}
-	sections := splitSections(out)
-	sections.attributeByFile(workDir, subjects)
-	var cases []junit.Case
-	seen := map[string]bool{}
-	all := make([]listed, 0, len(subjects)+len(unreachable))
-	all = append(all, subjects...)
-	all = append(all, unreachable...)
-	for _, p := range all {
-		seen[p.ImportPath] = true
+	// results is keyed by the normalised case name: test-variant spellings of one package share
+	// the owning package's case. order records first appearance.
+	results := map[string]string{}
+	order := []string{}
+	add := func(p listed, text string) {
+		key := normPath(p.ImportPath)
+		if _, ok := results[key]; !ok {
+			order = append(order, key)
+			results[key] = ""
+		}
+		if text != "" {
+			if results[key] != "" {
+				results[key] += "\n" + text
+			} else {
+				results[key] = text
+			}
+		}
+	}
+	for _, p := range subjects {
+		var text string
+		if combinedFailed {
+			out, exit, err := goRun(p.Dir, []string{k.Sub, "."}, true)
+			if err != nil {
+				return nil, err
+			}
+			if exit != 0 {
+				text = strings.TrimSpace(string(out))
+			}
+		}
+		add(p, text)
+	}
+	for _, p := range unreachable {
 		var text []string
 		if p.Error != nil {
 			text = append(text, p.Error.Err)
@@ -190,46 +224,21 @@ func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 		for _, e := range p.DepsErrors {
 			text = append(text, e.Err)
 		}
-		if s, ok := sections.byName[p.ImportPath]; ok {
-			text = append(text, s)
-		}
-		cases = append(cases, makeCase(p.ImportPath, text))
+		add(p, strings.Join(text, "\n"))
 	}
-	for _, name := range sections.order {
-		if !seen[name] && name != "" { // a package outside the subjects that failed
-			cases = append(cases, makeCase(name, []string{sections.byName[name]}))
-		}
-	}
-	// Unheaded continuation output (a line no "# <import path>" header claimed)
-	// belongs to the previous attributed line's package: one broken package is
-	// one failing case, not two.
-	leftover := strings.TrimSpace(sections.byName[""])
-	if leftover != "" && exit != 0 {
-		attached := false
-		for i := len(cases) - 1; i >= 0; i-- {
-			if cases[i].Failure != nil {
-				cases[i].Failure.Text = strings.TrimSpace(cases[i].Failure.Text + "\n" + leftover)
-				attached = true
-				break
-			}
-		}
-		if !attached {
-			cases = append(cases, makeCase(unattributedCase, []string{leftover}))
-		}
-	}
-	if exit != 0 && !anyFailed(cases) {
-		cases = append(cases, makeCase(unattributedCase, []string{fmt.Sprintf("go %s exited with status %d and named no package", k.Sub, exit)}))
+	var cases []junit.Case
+	for _, key := range order {
+		cases = append(cases, makeCase(key, []string{results[key]}))
 	}
 	return cases, nil
 }
 
-func anyFailed(cases []junit.Case) bool {
-	for _, c := range cases {
-		if c.Failure != nil {
-			return true
-		}
-	}
-	return false
+// normPath normalises a test-variant spelling of a package to its owning package's import path:
+// the go command names a package's external test variant <path>_test (and prints # <path>_test
+// [<path>.test] headers). Such a package is never a case of its own: its findings belong to the
+// case named by the owning package's import path.
+func normPath(p string) string {
+	return strings.TrimSuffix(p, "_test")
 }
 
 func makeCase(name string, text []string) junit.Case {
@@ -244,90 +253,6 @@ func makeCase(name string, text []string) junit.Case {
 	first, _, _ := strings.Cut(joined, "\n")
 	c.Failure = &junit.Problem{Message: first, Text: joined}
 	return c
-}
-
-// sectionSet is the compiler or vet output of one run, filed under its "# <import path>" headers.
-type sectionSet struct {
-	byName map[string]string
-	order  []string
-}
-
-// attributeByFile moves the unheaded lines that start with "<file>:" (go vet prints its findings
-// that way, with no "# <import path>" header) under the package whose directory holds the file.
-// A line it cannot place stays unattributed.
-func (s *sectionSet) attributeByFile(workDir string, subjects []listed) {
-	root, err := filepath.Abs(workDir)
-	if err != nil {
-		return
-	}
-	dirs := map[string]string{}
-	for _, p := range subjects {
-		if p.Dir != "" {
-			dirs[realPath(p.Dir)] = p.ImportPath
-		}
-	}
-	var kept []string
-	for _, line := range strings.Split(s.byName[""], "\n") {
-		if line == "" {
-			continue
-		}
-		file, _, found := strings.Cut(strings.TrimPrefix(line, "vet: "), ":")
-		if !found {
-			kept = append(kept, line)
-			continue
-		}
-		if !filepath.IsAbs(file) {
-			file = filepath.Join(root, file)
-		}
-		name, ok := dirs[realPath(filepath.Dir(file))]
-		if !ok {
-			kept = append(kept, line)
-			continue
-		}
-		if _, seen := s.byName[name]; !seen {
-			s.order = append(s.order, name)
-		}
-		s.byName[name] += line + "\n"
-	}
-	s.byName[""] = strings.Join(kept, "\n")
-}
-
-// realPath resolves symbolic links so two spellings of one directory compare equal.
-func realPath(p string) string {
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		return r
-	}
-	return filepath.Clean(p)
-}
-
-// splitSections cuts go build or go vet output at its "# <import path>" headers. Text before the
-// first header is filed under the empty name. Header forms go vet uses -- `# [<path>]` and
-// `# <path> [<path>.test]` -- are normalised to the package's import path so the error they head
-// is filed under one case per package.
-func splitSections(out []byte) sectionSet {
-	set := sectionSet{byName: map[string]string{}}
-	cur := ""
-	file := func(name string) {
-		if _, ok := set.byName[name]; !ok {
-			set.byName[name] = ""
-			set.order = append(set.order, name)
-		}
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(line, "# ") {
-			cur, _, _ = strings.Cut(strings.TrimPrefix(line, "# "), " ")
-			cur = strings.TrimPrefix(cur, "[")
-			cur = strings.TrimSuffix(cur, "]")
-			file(cur)
-			continue
-		}
-		if line == "" {
-			continue
-		}
-		file(cur)
-		set.byName[cur] += line + "\n"
-	}
-	return set
 }
 
 // list runs `go list -e -json` and decodes the stream of package objects.
