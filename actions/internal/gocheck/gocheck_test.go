@@ -204,6 +204,32 @@ func TestBuiltBinariesExitWithTheContractCodes(t *testing.T) {
 	}
 }
 
+func TestTheRecordedFixturesGiveTheOutcomeTheirRecordsExpect(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		kind    Kind
+		fixture string
+		failed  string
+	}{
+		{Build, "go-compile-error", "example.invalid/gocompileerror/bad"},
+		{Vet, "go-vet-finding", "example.invalid/govetfinding/noisy"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.fixture, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			copyTree(t, filepath.Join("..", "..", "..", "conformance", "testdata", "tool-fixtures", tc.fixture), dir)
+			if code := Run(tc.kind, dir, nil, &bytes.Buffer{}); code != ExitFail {
+				t.Fatalf("exit %d, want 1: the record expects findings", code)
+			}
+			got := outcomes(readSuite(t, dir, tc.kind.ReportName()))
+			if len(got) != 2 || !got[tc.failed] {
+				t.Fatalf("cases = %v, want exactly %s failed", got, tc.failed)
+			}
+		})
+	}
+}
+
 // copyTree copies the regular files of src into dst.
 func copyTree(t *testing.T, src, dst string) {
 	t.Helper()

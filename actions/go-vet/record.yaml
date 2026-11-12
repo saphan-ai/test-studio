@@ -1,0 +1,12 @@
+schema: tool-invocation/v1
+id: go-vet
+ecosystem: go
+version: "1.0.0"
+pin: {asset: go-vet, sha256: "c2197c04952f658494ee5c01823e27429c97b38362a0abaed8e7b500b5338dd9"}
+licence_class: osi
+command: [go-vet, ./...]
+inputs: ["."]
+egress: none
+exit_map: {0: clean, 1: findings, default: tool-error}
+output: {format: junit-xml, path: go-vet.junit.xml}
+fixture: {repo: go-vet-finding, expect: findings}

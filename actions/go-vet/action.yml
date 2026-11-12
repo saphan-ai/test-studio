@@ -1,0 +1,16 @@
+name: go-vet
+description: Vet the selected Go packages and report one JUnit case per package.
+inputs:
+  packages:
+    description: Package patterns to vet, as the go command reads them.
+    default: ./...
+    required: false
+outputs:
+  junit:
+    description: Path of the JUnit report, relative to the job's work directory.
+    value: go-vet.junit.xml
+runs:
+  using: composite
+  steps:
+    - run: go-vet ${{ inputs.packages }}
+      shell: saphan-proc
