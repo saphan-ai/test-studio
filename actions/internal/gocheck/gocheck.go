@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -149,10 +150,7 @@ func runnerFailure(k Kind, workDir string, cause error, stderr io.Writer) int {
 // failure carrying that package's own go command output.
 //
 // Case names come from go list output only. Header forms the go command prints for test variants
-// (# <path>, # [<path>], # <path> [<path>.test], # <path>_test [<path>.test]) never name a case:
-// a package whose import path ends in _test is the external test variant of the package named
-// without the suffix, so its findings are folded onto the owning package's case and no _test
-// case is ever emitted.
+// (# <path>, # [<path>], # <path> [<path>.test], # <path>_test [<path>.test]) never name a case.
 func check(k Kind, workDir string, patterns []string) ([]junit.Case, error) {
 	for _, p := range patterns {
 		if p == "" || strings.HasPrefix(p, "-") || strings.ContainsRune(p, 0) {
@@ -321,28 +319,40 @@ func goRun(dir string, args []string, combined bool) ([]byte, []byte, int, error
 // saved with `go env -w`, falling back to the process environment when go itself cannot run
 // (a work-skipping GOFLAGS breaks go env as well).
 func goEnvGoflags(workDir string) string {
-	cmd := exec.Command("go", "env", "GOFLAGS")
-	cmd.Dir = workDir
-	out, err := cmd.Output()
-	if err != nil {
+	out, _, code, err := goRun(workDir, []string{"env", "GOFLAGS"}, false)
+	if err != nil || code != 0 {
 		return os.Getenv("GOFLAGS")
 	}
 	return strings.TrimSpace(string(out))
 }
 
-// workSkippingGoflag returns a flag in the effective GOFLAGS that makes the go command skip
-// work while still exiting 0, or "" when none is set. The set is derived from the pinned
-// toolchain's own documentation: `go help build` documents -n as "print the commands but do
-// not run them" -- it exits 0 without compiling anything, which is exactly B-2. Other flags
-// (for example -toolexec) may change how tools run or fail on their own, but they do not
-// silently skip the work, so they are not refused here; a failed go list names its cause
-// instead (see list).
+// workSkippingGoflag returns the first token of the effective GOFLAGS that sets the go
+// command's -n flag ("print the commands but do not run them", see `go help build`) to true,
+// or "" when there is none. With it go compiles nothing and still exits 0. Each token is read
+// the way the go command's flag parser reads it: one or two leading dashes, the name up to the
+// first "=", and an optional value. The flag name must be exactly n; the token is refused
+// unless it carries a value that strconv.ParseBool reads as false (1, t, T, TRUE, true, True
+// are true; 0, f, F, FALSE, false, False are false). A bare -n is true, and a value that does
+// not parse as a bool is refused too. Other flags (for example -toolexec) may change how tools
+// run or fail on their own, but they do not skip the work, so they are not refused here; a
+// failed go list names its cause instead (see list).
 func workSkippingGoflag(workDir string) string {
 	for _, tok := range strings.Fields(goEnvGoflags(workDir)) {
 		tok = strings.Trim(tok, `"'`)
-		if tok == "-n" {
-			return tok
+		name := strings.TrimPrefix(strings.TrimPrefix(tok, "-"), "-")
+		if !strings.HasPrefix(tok, "-") {
+			continue
 		}
+		name, value, hasValue := strings.Cut(name, "=")
+		if name != "n" {
+			continue
+		}
+		if hasValue {
+			if v, err := strconv.ParseBool(value); err == nil && !v {
+				continue
+			}
+		}
+		return tok
 	}
 	return ""
 }
