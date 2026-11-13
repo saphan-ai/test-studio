@@ -1,8 +1,8 @@
 ---
 name: gitleaks
-description: gitleaks: secret scanning at pinned release v8.30.1; scans a repository tree for hard-coded secrets, keys and tokens, and reports each match as a SARIF 2.1.0 result with ruleId, location and fingerprint. Use it when a change adds, moves or touches credentials and the ASK library must run the pinned scan deterministically; reach for a repository-native scan (VCS push protection, a pre-commit hook) when the question is a single commit's diff, and for a dependency advisory scan when the question is vulnerable libraries rather than secrets at rest.
+description: gitleaks: secret scanning at pinned release v8.30.1; scans a repository tree for hard-coded secrets, keys and tokens, and reports each match as a SARIF 2.1.0 result with ruleId, location and fingerprint. Use it when a change adds, moves or touches credentials and the pinned scan must run deterministically; reach for a repository-native scan (VCS push protection, a pre-commit hook) when the question is a single commit's diff, and for a dependency advisory scan when the question is vulnerable libraries rather than secrets at rest.
 license: MIT
-compatibility: the binary pinned by adapters/gitleaks/record.yaml (gitleaks, v8.30.1); staged by the master's gate and not present on every seat
+compatibility: the binary pinned by adapters/gitleaks/record.yaml (gitleaks, v8.30.1); installed by the operator; not present on every machine
 metadata:
   saphan.origin: builtin
   saphan.default: "off"
@@ -13,7 +13,7 @@ metadata:
   saphan.upstream: zricethezav/gitleaks@v8.30.1 (MIT)
 ---
 
-# gitleaks: secret scanning in the ASK library
+# gitleaks: secret scanning
 
 ## When to use it
 
@@ -22,7 +22,7 @@ The question it answers: does the repository tree contain a secret, and where? T
 Use it when:
 
 - a change adds, rotates or moves credentials, keys or tokens;
-- the ASK library must show a deterministic, pinned scan of a repository or subtree;
+- the change must show a deterministic, pinned scan of a repository or subtree;
 - a finding reported elsewhere needs confirmation under the same pinned configuration.
 
 Do not use it for:
@@ -46,7 +46,7 @@ SARIF 2.1.0: a document whose `version` is exactly `2.1.0` with a non-empty `run
 - `locations` — the file and region where the secret appears;
 - `partialFingerprints` / `fingerprints` — the finding's identity, the value `.saphan-waivers.yaml` matches on.
 
-The report carries the rule id, the file and the line of each match — never the secret's value. An agent works from rule id, file, line and fingerprint only. It never opens, prints or copies the matched value; looking at the value is a human's job. `--redact` is on the invocation so no secret value reaches the report the fleet stores as evidence.
+The report carries the rule id, the file and the line of each match — never the secret's value. An agent works from rule id, file, line and fingerprint only. It never opens, prints or copies the matched value; looking at the value is a human's job. `--redact` is on the invocation so no secret value reaches the report kept as evidence.
 
 Noise on a typical repository: strings that look like keys but are test fixtures, example values or public constants (for example the fixture's `TSFIXTURE-SYNTHETIC-…` token), and anything already rotated. A finding is noise only after a human decides it; the default decision is that a finding is real.
 
