@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Mocks Studio — runs and scenarios (v1)
+  title: Mock Studio — runs and scenarios (v1)
   version: 1.0.0
   description: >
     Appendix C of the W0 ADR draft (train mock-studio, 2026-10-29). Normative for the operations a

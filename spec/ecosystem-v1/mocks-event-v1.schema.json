@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mocks.event/v1",
-  "title": "Mocks Studio event envelope, version 1",
+  "title": "Mock Studio event envelope, version 1",
   "description": "Appendix A of the ADR draft 'One run, one correlation id, one event schema' (W0, train mock-studio, 2026-10-29). Normative.",
   "type": "object",
   "additionalProperties": false,
