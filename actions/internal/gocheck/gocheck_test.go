@@ -633,26 +633,49 @@ var X = 1
 	}
 }
 
-// TestWorkSkippingGoflagIsRefusedByName reproduces B-2: GOFLAGS=-n makes go print commands and
-// run none, so a broken module would pass with exit 0. The runner refuses the work-skipping
-// flag by name: exit 2, one runner error case, the reason named on stderr.
+// TestWorkSkippingGoflagIsRefusedByName: GOFLAGS carrying the go command's -n flag set true, in
+// any spelling the go command accepts, makes go print commands and run none, so a broken module
+// would pass with exit 0. The runner refuses it by name: exit 2, one runner error case, the
+// token named on stderr. A false spelling is not refused: go then runs and the package fails.
 func TestWorkSkippingGoflagIsRefusedByName(t *testing.T) {
-	dir := writeModule(t, map[string]string{"bad/bad.go": brokenPackage})
+	refused := []struct{ flags, token string }{
+		{"-n", "-n"}, {"--n", "--n"}, {"-n=true", "-n=true"}, {"--n=true", "--n=true"},
+		{"-n=1", "-n=1"}, {"-n=T", "-n=T"}, {"-n=TRUE", "-n=TRUE"},
+		{"-x -n=true", "-n=true"}, {"-n=maybe", "-n=maybe"},
+	}
+	notRefused := []string{"-n=false", "--n=0", "-n=F", ""}
 	for _, k := range []Kind{Build, Vet} {
-		t.Run(k.ID, func(t *testing.T) {
-			t.Setenv("GOFLAGS", "-n")
-			var stderr bytes.Buffer
-			if code := Run(k, dir, nil, &stderr); code != ExitRunner {
-				t.Fatalf("%s exit %d with GOFLAGS=-n on a broken package, want %d; stderr: %s", k.ID, code, ExitRunner, stderr.String())
-			}
-			if !strings.HasPrefix(stderr.String(), k.ID+": ") || !strings.Contains(stderr.String(), "-n") {
-				t.Fatalf("%s stderr %q does not name the work-skipping flag", k.ID, stderr.String())
-			}
-			s := readSuite(t, dir, k.ReportName())
-			if s.Errors != 1 || len(s.Cases) != 1 || s.Cases[0].Name != runnerCase || s.Cases[0].Error == nil {
-				t.Fatalf("a refused go leaves one runner error case, got %+v", s)
-			}
-		})
+		for _, r := range refused {
+			t.Run(k.ID+"/refused/"+r.flags, func(t *testing.T) {
+				dir := writeModule(t, map[string]string{"bad/bad.go": brokenPackage})
+				t.Setenv("GOFLAGS", r.flags)
+				var stderr bytes.Buffer
+				if code := Run(k, dir, nil, &stderr); code != ExitRunner {
+					t.Fatalf("%s exit %d with GOFLAGS=%q on a broken package, want %d; stderr: %s", k.ID, code, r.flags, ExitRunner, stderr.String())
+				}
+				if !strings.HasPrefix(stderr.String(), k.ID+": ") || !strings.Contains(stderr.String(), `"`+r.token+`"`) {
+					t.Fatalf("%s stderr %q does not name the work-skipping token %q", k.ID, stderr.String(), r.token)
+				}
+				s := readSuite(t, dir, k.ReportName())
+				if s.Errors != 1 || len(s.Cases) != 1 || s.Cases[0].Name != runnerCase || s.Cases[0].Error == nil {
+					t.Fatalf("a refused go leaves one runner error case, got %+v", s)
+				}
+			})
+		}
+		for _, flags := range notRefused {
+			t.Run(k.ID+"/not-refused/"+flags, func(t *testing.T) {
+				dir := writeModule(t, map[string]string{"bad/bad.go": brokenPackage})
+				t.Setenv("GOFLAGS", flags)
+				var stderr bytes.Buffer
+				if code := Run(k, dir, nil, &stderr); code != ExitFail {
+					t.Fatalf("%s exit %d with GOFLAGS=%q on a broken package, want %d; stderr: %s", k.ID, code, flags, ExitFail, stderr.String())
+				}
+				s := readSuite(t, dir, k.ReportName())
+				if s.Failures != 1 || len(s.Cases) != 1 || s.Cases[0].Failure == nil {
+					t.Fatalf("the broken package must fail, got %+v", s)
+				}
+			})
+		}
 	}
 }
 
