@@ -1,11 +1,11 @@
 {
-  "description": "Appendix B of the W0 ADR draft (train mock-studio, 2026-10-29). Each invalid example mutates exactly one field of valid[0] and names it (law #27). W1's conformance suite runs every entry against Appendix A (published as spec/ecosystem-v1/mocks-event-v1.schema.json).",
+  "description": "Appendix B of the ecosystem contract. Each invalid example mutates exactly one field of valid[0] and names it. The conformance suite runs every entry against Appendix A (published as spec/ecosystem-v1/mocks-event-v1.schema.json).",
   "valid": [
     {
       "schema": "mocks.event/v1",
       "event_id": "evt-01HZX3K9Q0001",
       "at": "2026-10-29T04:10:00.123Z",
-      "run_id": "leg-w10-openapi-r1",
+      "run_id": "run-openapi-example-1",
       "test_run_id": "tr-0001",
       "step_id": "checkout.pay",
       "correlation_id": "4bf92f3577b34da6a3ce929d0e0e4736",
@@ -23,7 +23,7 @@
       "schema": "mocks.event/v1",
       "event_id": "evt-01HZX3K9Q0002",
       "at": "2026-10-29T04:10:01.500Z",
-      "run_id": "leg-w10-openapi-r1",
+      "run_id": "run-openapi-example-1",
       "correlation_id": "9a1c4d7e2b3f4a5b8c6d0e1f2a3b4c5d",
       "correlation_source": "correlation-key",
       "correlation_keys": { "recipient": "+000000000001" },
@@ -39,7 +39,7 @@
       "schema": "mocks.event/v1",
       "event_id": "evt-01HZX3K9Q0003",
       "at": "2026-10-29T04:10:02.000Z",
-      "run_id": "leg-w10-openapi-r1",
+      "run_id": "run-openapi-example-1",
       "correlation_id": "1f2e3d4c5b6a79881f2e3d4c5b6a7988",
       "correlation_source": "generated",
       "mock": { "name": "smtp-catcher", "version": "0.1.0", "contract": "mocks.adapter/v1" },
