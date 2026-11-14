@@ -1,0 +1,12 @@
+schema: tool-invocation/v1
+id: go-build
+ecosystem: go
+version: "1.0.0"
+pin: {asset: go-build, sha256: "6fe1576e3590ac148f2989d246949d5fd1db838918490c9bcd68a9b532a7ff81"}
+licence_class: osi
+command: [go-build, ./...]
+inputs: ["."]
+egress: none
+exit_map: {0: clean, 1: findings, default: tool-error}
+output: {format: junit-xml, path: go-build.junit.xml}
+fixture: {repo: go-compile-error, expect: findings}

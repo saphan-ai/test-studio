@@ -88,6 +88,7 @@ mocks, and Test Studio runs the tests and gives the verdict.
 | [`conformance/`](conformance) | the conformance suite, its sample adapter and the four-test sample project |
 | [`adapters/go-test/`](adapters/go-test) | `tests-go-test`, the adapter for Go tests |
 | [`spec/TOOL_RECORD_V1.md`](spec/TOOL_RECORD_V1.md) | a one-file description of how an outside tool (a linter, a secret scanner) is run and what its result means, with its checker `tool-conformance` |
+| [`spec/TOOL_ACTION_V1.md`](spec/TOOL_ACTION_V1.md), [`actions/`](actions) | a pipeline check as a catalogue action: an `action.yml` beside a pinned runner that writes JUnit, with its validator and the first two actions, `go-build` and `go-vet` |
 | [`docscheck/`](docscheck) | the test that keeps this page honest: its commands run, its numbers are recomputed |
 
 ## See a real example
