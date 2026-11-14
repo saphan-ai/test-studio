@@ -332,7 +332,7 @@ It prints the sha256 of the file it used, so a reader of the result knows which 
 | CycloneDX 1.5 companion | `spdx.schema.json`, in the same directory as `bom-1.5.schema.json` | `4f6e2b05c05d26a4f2dc5879fbc2fca94b0a28db46289d0c51345621b71cfbfc` |
 | CycloneDX 1.5 companion | `jsf-0.82.schema.json`, in the same directory as `bom-1.5.schema.json` | `8bae002c25e723db7ee1f26afde680ae1a2b1a8f6b4b4b0fd65dc3becb090aae` |
 
-remark: these four digests were measured by the tool-record master on 2026-10-31 from those URLs; this repository's
+remark: these four digests were measured on 2026-10-31 from those URLs; this repository's
 author fetched nothing and has not re-measured them. `bom-1.5.schema.json` references the two companion files, which
 must sit beside it for the schema to compile.
 

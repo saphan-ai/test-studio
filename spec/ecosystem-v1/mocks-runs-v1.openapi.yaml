@@ -1,13 +1,13 @@
 openapi: 3.1.0
 info:
-  title: Mocks Studio — runs and scenarios (v1)
+  title: Mock Studio — runs and scenarios (v1)
   version: 1.0.0
   description: >
-    Appendix C of the W0 ADR draft (train mock-studio, 2026-10-29). Normative for the operations a
-    test, a leg or a person uses to open a run, attach a test run, set a scenario, reset and close.
+    Appendix C of the ecosystem contract. Normative for the operations a
+    test, an agent or a person uses to open a run, attach a test run, set a scenario, reset and close.
     The core implements it (closed); the shape is public. Every refusal is a Refusal document whose
-    first sentence says what was measured, what was refused and what to do next (law #55).
-    Every operation except openRun requires the run credential (ADR section 5b): missing → 401
+    first sentence says what was measured, what was refused and what to do next.
+    Every operation except openRun requires the run credential (contract section 5b): missing → 401
     run-credential-missing; another run's, expired or revoked → 403 run-credential-invalid.
 security:
   - runCredential: []
