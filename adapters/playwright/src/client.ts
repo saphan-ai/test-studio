@@ -63,10 +63,13 @@ export function withoutQuery(url: string): string {
 }
 
 export class CoreClient {
-  constructor(
-    private readonly host: ClientHost,
-    private readonly fetchImpl: typeof fetch = fetch,
-  ) {}
+  private readonly host: ClientHost;
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(host: ClientHost, fetchImpl: typeof fetch = fetch) {
+    this.host = host;
+    this.fetchImpl = fetchImpl;
+  }
 
   /** Sends a request. A refusal is printed once and returned; it is never retried. */
   async send(req: Request): Promise<Answer> {
