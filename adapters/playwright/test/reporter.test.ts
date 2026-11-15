@@ -18,14 +18,14 @@ interface Run {
 }
 
 /** Runs one fixture project with exactly the given environment (plus the host's PATH, HOME and TMPDIR). */
-function runFixture(name: string, env: Record<string, string>): Promise<Run> {
+function runFixture(name: string, env: Record<string, string>, extraArgs: string[] = []): Promise<Run> {
   const hostEnv: Record<string, string> = {};
   for (const k of ['PATH', 'HOME', 'TMPDIR']) {
     const v = process.env[k];
     if (v !== undefined) hostEnv[k] = v;
   }
   return new Promise((resolve, reject) => {
-    const child = spawn(playwright, ['test', '--config', path.join(packageDir, 'test', 'fixtures', name, 'playwright.config.ts')], {
+    const child = spawn(playwright, ['test', '--config', path.join(packageDir, 'test', 'fixtures', name, 'playwright.config.ts'), ...extraArgs], {
       cwd: packageDir, env: { ...hostEnv, ...env }, stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -91,6 +91,27 @@ describe('a run against a core', () => {
 
 });
 
+describe('a run that stops early', () => {
+  test('accounts for every test that never started as an error that says so', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('outcomes', { TESTS_CORE_URL: core.url }, ['--max-failures=1', '--workers=1']);
+      assert.notEqual(run.code, 0);
+      assert.equal(core.steps.size, 7, 'every test of the project has a step');
+      assert.equal(stepNamed(core, 'passes').result, 'pass');
+      assert.equal(stepNamed(core, 'fails an assertion').result, 'fail');
+      for (const part of ['is skipped', 'times out', 'is expected to fail and does', 'is expected to fail and passes', 'has a step']) {
+        const step = stepNamed(core, part);
+        assert.equal(step.result, 'error', part);
+        assert.match(step.failure ?? '', /never ran/u, part);
+      }
+      assert.deepEqual(core.closed[0]?.['counts'], { total: 7, passed: 1, failed: 1, errored: 5, skipped: 0 });
+    } finally {
+      await core.close();
+    }
+  });
+});
+
 describe('a recorded trace', () => {
   test('is stored as an artifact of its step', async () => {
     const core = await startFakeCore();
@@ -141,11 +162,22 @@ describe('the worker side', () => {
 });
 
 describe('a core that cannot be used', () => {
+  test('the same project exits zero when the core is there (so the non-zero exits below are the reporter\'s)', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('allpass', { TESTS_CORE_URL: core.url });
+      assert.equal(run.code, 0, `${run.stdout}${run.stderr}`);
+      assert.equal(core.closed[0]?.['verdict'], 'pass');
+    } finally {
+      await core.close();
+    }
+  });
+
   test('an unreachable core fails the run with one plain line on standard error', async () => {
     const core = await startFakeCore();
     const url = core.url;
     await core.close();
-    const run = await runFixture('probe', { TESTS_CORE_URL: url });
+    const run = await runFixture('allpass', { TESTS_CORE_URL: url });
     assert.notEqual(run.code, 0, 'the run must not pass when nothing could be reported');
     const lines = run.stderr.split('\n').filter((l) => l.startsWith('tests-playwright-reporter:'));
     assert.equal(lines.length, 1, run.stderr);
@@ -153,7 +185,7 @@ describe('a core that cannot be used', () => {
   });
 
   test('no core address fails the run and names the variable', async () => {
-    const run = await runFixture('probe', {});
+    const run = await runFixture('allpass', {});
     assert.notEqual(run.code, 0);
     assert.match(run.stderr, /TESTS_CORE_URL is not set/u);
   });
@@ -161,7 +193,7 @@ describe('a core that cannot be used', () => {
   test('a core that serves no version this reporter speaks is refused by name', async () => {
     const core = await startFakeCore(['v2']);
     try {
-      const run = await runFixture('probe', { TESTS_CORE_URL: core.url });
+      const run = await runFixture('allpass', { TESTS_CORE_URL: core.url });
       assert.notEqual(run.code, 0);
       assert.match(run.stderr, /serves spec versions \[v2\] and this reporter speaks v1/u);
       assert.equal(core.steps.size, 0, 'nothing may be started on a core that was refused');
