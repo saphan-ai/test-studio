@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, describe, test } from 'node:test';
-import { startFakeCore, type FakeCore, type RecordedStep } from './fakecore.ts';
+import { LEG_TOKEN, startFakeCore, type FakeCore, type RecordedStep } from './fakecore.ts';
 
 const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const playwright = path.join(packageDir, 'node_modules', '.bin', 'playwright');
@@ -106,6 +106,120 @@ describe('a run that stops early', () => {
         assert.match(step.failure ?? '', /never ran/u, part);
       }
       assert.deepEqual(core.closed[0]?.['counts'], { total: 7, passed: 1, failed: 1, errored: 5, skipped: 0 });
+    } finally {
+      await core.close();
+    }
+  });
+});
+
+describe('an error outside any test', () => {
+  test('a spec file that cannot load makes the run result error, and the run exits non-zero', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('importerror', { TESTS_CORE_URL: core.url });
+      assert.notEqual(run.code, 0, `${run.stdout}${run.stderr}`);
+      // Playwright stops the whole run when a file cannot load, so no test of the project ran.
+      assert.deepEqual(core.closed[0]?.['counts'], { total: 1, passed: 0, failed: 0, errored: 1, skipped: 0 });
+      const extra = stepNamed(core, 'errors outside any test');
+      assert.equal(extra.result, 'error');
+      assert.match(extra.failure ?? '', /tests-playwright-reporter-no-such-module/u);
+      assert.equal(core.closed[0]?.['verdict'], 'error');
+      assert.match(run.stdout, /verdict=error /u);
+    } finally {
+      await core.close();
+    }
+  });
+
+  test('a global setup that throws makes the run result error', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('setuperror', { TESTS_CORE_URL: core.url });
+      assert.notEqual(run.code, 0, `${run.stdout}${run.stderr}`);
+      assert.equal(core.closed[0]?.['verdict'], 'error', `${run.stdout}${run.stderr}`);
+      assert.match(stepNamed(core, 'errors outside any test').failure ?? '', /global setup failed on purpose/u);
+    } finally {
+      await core.close();
+    }
+  });
+});
+
+describe('a test that the run interrupted', () => {
+  test('is an error, never a skip', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('interrupt', { TESTS_CORE_URL: core.url });
+      assert.notEqual(run.code, 0);
+      assert.equal(stepNamed(core, 'fails while the other runs').result, 'fail');
+      const interrupted = stepNamed(core, 'is still running when the run stops');
+      assert.equal(interrupted.result, 'error', `${run.stdout}${run.stderr}`);
+      assert.equal(core.closed[0]?.['verdict'], 'error');
+    } finally {
+      await core.close();
+    }
+  });
+});
+
+describe('a fixture or a hook that throws', () => {
+  test('is an error for the test that needed it, and for the tests a failed beforeAll or serial group skipped', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('hooks', { TESTS_CORE_URL: core.url });
+      assert.notEqual(run.code, 0);
+      const failures: Array<[string, string, RegExp]> = [
+        ['uses a broken fixture', 'error', /fixture or hook failed/u],
+        ['has a failing beforeEach', 'error', /fixture or hook failed/u],
+        ['first after a failed beforeAll', 'error', /fixture or hook failed/u],
+        ['serial one fails', 'fail', /toBe/u],
+        ['serial two is skipped by the group', 'error', /never ran|did not run/u],
+      ];
+      for (const [part, result, text] of failures) {
+        const step = stepNamed(core, part);
+        assert.equal(step.result, result, `${part}: ${step.failure ?? ''}`);
+        assert.match(step.failure ?? '', text, part);
+      }
+      assert.equal(stepNamed(core, 'second after a failed beforeAll').result, 'error');
+    } finally {
+      await core.close();
+    }
+  });
+});
+
+describe('a credential the core does not accept', () => {
+  const leg = { MOCKS_RUN_ID: 'run-fake0001' };
+
+  test('a missing credential fails the run with exactly one line on standard error', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('allpass', { TESTS_CORE_URL: core.url, ...leg });
+      assert.notEqual(run.code, 0, `${run.stdout}${run.stderr}`);
+      const lines = run.stderr.split('\n').filter((l) => l.startsWith('tests-playwright-reporter:'));
+      assert.equal(lines.length, 1, run.stderr);
+      assert.match(lines[0] ?? '', /credential-refused/u);
+      assert.equal(core.steps.size, 0);
+    } finally {
+      await core.close();
+    }
+  });
+
+  test('a refused credential fails the run with exactly one line, and the credential is not printed', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('allpass', { TESTS_CORE_URL: core.url, ...leg, MOCKS_RUN_TOKEN: 'a-wrong-credential-value' });
+      assert.notEqual(run.code, 0, `${run.stdout}${run.stderr}`);
+      const lines = run.stderr.split('\n').filter((l) => l.startsWith('tests-playwright-reporter:'));
+      assert.equal(lines.length, 1, run.stderr);
+      assert.ok(!`${run.stdout}${run.stderr}`.includes('a-wrong-credential-value'));
+    } finally {
+      await core.close();
+    }
+  });
+
+  test('an accepted credential attaches the run', async () => {
+    const core = await startFakeCore();
+    try {
+      const run = await runFixture('allpass', { TESTS_CORE_URL: core.url, ...leg, MOCKS_RUN_TOKEN: LEG_TOKEN });
+      assert.equal(run.code, 0, `${run.stdout}${run.stderr}`);
+      assert.equal(core.closed[0]?.['verdict'], 'pass');
     } finally {
       await core.close();
     }

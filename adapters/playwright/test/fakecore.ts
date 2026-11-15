@@ -32,6 +32,9 @@ export interface FakeCore {
   close(): Promise<void>;
 }
 
+/** The credential a leg run must present to attach a test run. */
+export const LEG_TOKEN = 'leg-token-for-tests';
+
 function body(req: http.IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -66,6 +69,9 @@ async function handle(core: FakeCore, versions: string[], req: http.IncomingMess
   const data = await body(req);
   core.auth.push({ path, header: req.headers.authorization });
   if (req.method === 'GET' && path === '/v1/spec') return send(res, 200, { versions });
+  if (req.method === 'POST' && /^\/v1\/runs\/[^/]+\/test-runs$/u.test(path) && req.headers.authorization !== `Bearer ${LEG_TOKEN}`) {
+    return send(res, 401, { message: 'the leg credential is missing or wrong', reason_code: 'credential-refused' });
+  }
   if (req.method === 'POST' && (path === '/v1/test-runs' || /^\/v1\/runs\/[^/]+\/test-runs$/u.test(path))) {
     return send(res, 201, { test_run_id: 'tr-fake0001', run_id: 'run-fake0001', credential: core.credential });
   }
