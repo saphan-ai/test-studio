@@ -1,7 +1,6 @@
 import { expect, test as base } from '@playwright/test';
 
 const withBrokenFixture = base.extend<{ broken: string }>({
-  // eslint-disable-next-line no-empty-pattern
   broken: async ({}, use) => {
     if (Date.now() > 0) throw new Error('the fixture failed on purpose');
     await use('never');

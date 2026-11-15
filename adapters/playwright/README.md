@@ -85,7 +85,9 @@ tests-playwright-reporter: the core's GET /v1/spec could not be read (status 0, 
 ```
 
 The same happens when `TESTS_CORE_URL` is not set, when the core serves no version the reporter
-speaks (`v1`), when the core refuses to open or attach the test run, when it refuses to close it,
+speaks (`v1`), when the core refuses to open or attach the test run (a missing or refused
+credential prints the one line that names the core's refusal, and no second line), when it refuses
+to close it,
 and when any call during the run was refused or failed (the line says how many). The tests still
 run in these cases: a reporter cannot stop Playwright before it starts them.
 
@@ -114,9 +116,12 @@ How an outcome becomes a result:
 | skipped (`test.skip`, a skipping annotation) | `skip` |
 | timed out | `error`, naming the timeout |
 | a fixture or a hook threw (the body may never have run) | `error`, naming the fixture or hook |
-| interrupted, or never started because the run stopped early (`--max-failures`, a crash) | `error`, saying it never ran |
+| skipped by a failed `beforeAll` or an earlier failure in a `serial` group, though nothing in the test says to skip it | `error` |
+| interrupted while running (another worker's failure under `--max-failures`, Ctrl-C), or never started because the run stopped early | `error`, saying it was interrupted or never ran |
+| an error outside any test (a spec file that cannot load, a failing `globalSetup`) | one extra step, `error` |
 
-A failed test is never reported as a pass. A test that Playwright retries is **one step**, finished
+A failed test is never reported as a pass, and an error outside any test makes the run result's
+verdict `error`. A test that Playwright retries is **one step**, finished
 once with its final outcome; the earlier attempts are `x-playwright.attempt` events and are written
 in the step's log.
 
@@ -187,9 +192,15 @@ set. `npm --prefix adapters/playwright run lint` and `run typecheck` are the oth
   the run and the first `step.started` event.
 - **One test run per Playwright process.** With `--shard`, each shard is its own run of the core.
 - **A core that is down does not stop the tests.** They run, and the run exits non-zero.
-- **Errors outside any test** (a failing `globalSetup`, for example) are printed on the reporter's
-  standard error and make Playwright fail, but they are not a step: the run result's counts hold
-  tests only.
+- **An error outside any test** (a spec file that cannot load, a failing `globalSetup` or
+  `globalTeardown`) is reported as one extra step, `playwright > errors outside any test`, with
+  result `error` and Playwright's error text. It counts as one item in the run result's tally, and
+  the run result's verdict is `error`. Playwright stops the whole run when a spec file cannot load,
+  so in that case that step is the only item.
+- **A test skipped by a failed `beforeAll` or by an earlier test of a `serial` group is an
+  `error`.** Its body never ran and nothing in its source says it was meant to be skipped, so the
+  reporter will not call it a `skip`. A test you skip yourself (`test.skip`, `test.fixme`) stays a
+  `skip`.
 - **A failed fixture is an `error`, whether it failed before the body or while tearing down after
   it.** Playwright does not say whether the body ran, so the reporter treats a fixture or hook
   failure as "the test could not be judged".
