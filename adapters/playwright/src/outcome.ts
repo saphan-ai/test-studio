@@ -12,12 +12,15 @@ export interface ResultLike {
   status: 'passed' | 'failed' | 'timedOut' | 'skipped' | 'interrupted';
   duration: number;
   errors: readonly ErrorLike[];
+  annotations?: readonly { type: string }[] | undefined;
 }
 
 /** The parts of Playwright's TestCase that matter here. */
 export interface TestLike {
   outcome(): 'skipped' | 'expected' | 'unexpected' | 'flaky';
   results: readonly ResultLike[];
+  expectedStatus?: string | undefined;
+  annotations?: readonly { type: string }[] | undefined;
 }
 
 export interface Mapped {
@@ -42,6 +45,18 @@ export function errorText(result: ResultLike | undefined): string {
 }
 
 /**
+ * True when a test was skipped although nothing says it was meant to be: no skip or fixme
+ * annotation, and Playwright did not expect it to be skipped. That is what a test looks like when
+ * a failed hook or a failed serial group before it kept its body from running.
+ */
+function skippedWithoutReason(test: TestLike, last: ResultLike | undefined): boolean {
+  if (last?.status !== 'skipped') return false;
+  if (test.expectedStatus === undefined || test.expectedStatus === 'skipped') return false;
+  const notes = [...(test.annotations ?? []), ...(last.annotations ?? [])];
+  return !notes.some((a) => a.type === 'skip' || a.type === 'fixme');
+}
+
+/**
  * Maps the final outcome of a test to one result. A failed assertion is `fail`. A test that never
  * got to run its body (a failed fixture or hook), one that timed out and one that was interrupted
  * are `error`: the test did not say the system is wrong, the run could not judge it. A test that
@@ -50,9 +65,17 @@ export function errorText(result: ResultLike | undefined): string {
  */
 export function mapOutcome(test: TestLike, infrastructureFailed: boolean): Mapped {
   const last = test.results.at(-1);
+  // Playwright's own outcome() leaves interrupted and timed-out results out of its judgement, so the
+  // last result is read first: an interrupted test must never fall through to `skip`.
+  if (last?.status === 'interrupted') {
+    return { result: 'error', failure: `the test run was interrupted before the test finished: ${errorText(last) || NO_TEXT}` };
+  }
+  if (last?.status === 'timedOut' && !infrastructureFailed && test.outcome() !== 'flaky') {
+    return { result: 'error', failure: `the test timed out after ${last.duration} ms: ${errorText(last) || NO_TEXT}` };
+  }
   switch (test.outcome()) {
     case 'skipped':
-      return { result: 'skip', failure: '' };
+      return skippedWithoutReason(test, last) ? { result: 'error', failure: 'the test did not run and was not marked as skipped: a hook or a serial group before it failed' } : { result: 'skip', failure: '' };
     case 'expected':
     case 'flaky':
       return { result: 'pass', failure: '' };
@@ -65,9 +88,6 @@ export function mapOutcome(test: TestLike, infrastructureFailed: boolean): Mappe
   }
   if (last?.status === 'timedOut') {
     return { result: 'error', failure: `the test timed out after ${last.duration} ms: ${text || NO_TEXT}` };
-  }
-  if (last?.status === 'interrupted') {
-    return { result: 'error', failure: `the test run was interrupted before the test finished: ${text || NO_TEXT}` };
   }
   if (last?.status === 'passed') {
     return { result: 'fail', failure: 'the test is marked as expected to fail (test.fail) but it passed' };

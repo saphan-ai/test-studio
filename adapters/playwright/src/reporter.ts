@@ -72,6 +72,12 @@ interface Item {
   finished: boolean;
 }
 
+/** What finishing a step needs: a test's item has it, and so does the step for errors outside tests. */
+type StepSubject = Pick<Item, 'stepId' | 'display' | 'correlation' | 'notedSteps' | 'finished'>;
+
+/** The notice Playwright raises when maxFailures stops the run; the failures it names are already results. */
+const STOPPED_EARLY = /^Testing stopped early after \d+ maximum allowed failures/u;
+
 interface NotedStep {
   depth: number;
   title: string;
@@ -115,6 +121,8 @@ export default class TestStudioReporter implements Reporter {
   private events = 0;
   private refusals = 0;
   private fatal = false;
+  /** How many lines the reporter has printed on its own error output. */
+  private lines = 0;
   private project = '';
 
   constructor(options: ReporterOptions = {}) {
@@ -229,13 +237,19 @@ export default class TestStudioReporter implements Reporter {
   private async openRun(): Promise<boolean> {
     const headers = { [HEADER_SPEC_VERSION]: SPEC_VERSION };
     const leg = this.env[ENV_LEG_RUN_ID] ?? '';
+    const linesBefore = this.lines;
     const answer =
       leg === ''
         ? await this.client.send({ method: 'POST', url: `${this.coreURL}/v1/test-runs`, headers, json: { project: this.project, ...(this.options.mocks?.length ? { mocks: this.options.mocks } : {}) } })
         : await this.client.send({ method: 'POST', url: `${this.coreURL}/v1/runs/${encodeURIComponent(leg)}/test-runs`, token: this.env[ENV_LEG_TOKEN] ?? '', headers, json: { project: this.project } });
     const opened = answer.status === 201 ? (JSON.parse(answer.body) as OpenedRun) : undefined;
     if (opened === undefined || !opened.test_run_id || !opened.credential) {
-      this.fail(`the core did not open or attach the test run (status ${answer.status}, error ${answer.error ?? 'none'}). NEXT — read the refusal above, or check ${ENV_CORE_URL} and ${ENV_LEG_RUN_ID}.`);
+      if (this.lines > linesBefore) {
+        // The client already printed the refusal, which names its reason: one line is enough.
+        this.fatal = true;
+      } else {
+        this.fail(`the core did not open or attach the test run (status ${answer.status}, error ${answer.error ?? 'none'}). NEXT — check ${ENV_CORE_URL} and ${ENV_LEG_RUN_ID}.`);
+      }
       return false;
     }
     this.addSecret(opened.credential);
@@ -300,7 +314,7 @@ export default class TestStudioReporter implements Reporter {
   }
 
   /** Attaches the evidence, finishes the step and emits its events. */
-  private async finishStep(item: Item, mapped: Mapped, durationMs: number, attachments: readonly AttachmentLike[], log: string): Promise<void> {
+  private async finishStep(item: StepSubject, mapped: Mapped, durationMs: number, attachments: readonly AttachmentLike[], log: string): Promise<void> {
     item.finished = true;
     const { items, notes } = await collectEvidence(attachments, this.options.maxEvidenceBytes ?? DEFAULT_MAX_EVIDENCE_BYTES, (s) => this.redact(s));
     const logText = truncateBytes(this.redact(notes.length > 0 ? `${log}\n${notes.join('\n')}\n` : log), MAX_LOG_BYTES);
@@ -321,7 +335,7 @@ export default class TestStudioReporter implements Reporter {
     await this.emit('step.finished', item.stepId, item.correlation, `step ${item.display} finished: ${mapped.result}`, mapped.result);
   }
 
-  private async attach(item: Item, ev: EvidenceItem): Promise<void> {
+  private async attach(item: StepSubject, ev: EvidenceItem): Promise<void> {
     const answer = await this.client.send({
       method: 'PUT',
       url: `${this.testRunURL()}/evidence/${ev.digest}`,
@@ -364,6 +378,7 @@ export default class TestStudioReporter implements Reporter {
     for (const e of this.globalErrors) {
       this.say(`Playwright reported an error outside any test: ${truncateChars(e.split('\n')[0] ?? '', MAX_SUMMARY_CHARS)}`);
     }
+    await this.reportErrorsOutsideTests(fullResult);
     const verdict = verdictOf(this.counts);
     // Closing revokes the credential, so run.closed must come first (specification section 9.2).
     await this.emit('run.closed', '', '', `test run closed with verdict ${verdict}`, verdict);
@@ -387,6 +402,32 @@ export default class TestStudioReporter implements Reporter {
       }
     }
     process.stdout.write(`${evidenceLine}\n`);
+  }
+
+  /**
+   * An error outside any test (a spec file that cannot load, a global setup or teardown that threw,
+   * a run that ended without passing) belongs to no test, so it is reported as one extra step that
+   * ends in `error`. Without it the tests that did run could give the run result `pass` while
+   * Playwright exits non-zero.
+   */
+  private async reportErrorsOutsideTests(fullResult: FullResult): Promise<void> {
+    const errors = this.globalErrors.filter((e) => !STOPPED_EARLY.test(e));
+    const endedWithoutPassing = fullResult.status !== 'passed' && verdictOf(this.counts) === 'pass';
+    if (errors.length === 0 && !endedWithoutPassing) return;
+    const used = new Set([...this.items.values()].map((i) => i.stepId));
+    const display = 'playwright > errors outside any test';
+    const subject: StepSubject = { stepId: uniqueStepId(display, used), display, correlation: '', notedSteps: [], finished: false };
+    const started = await this.post<StepStarted>('/steps', { step_id: subject.stepId, name: display });
+    if (started === undefined || !started.correlation_id) {
+      this.refusals++;
+      this.say(`the step for the errors outside any test was not started (${this.lastFailure}), so the run result may show a pass it should not.`);
+      return;
+    }
+    subject.correlation = started.correlation_id;
+    await this.emit('step.started', subject.stepId, subject.correlation, `step ${display} started`);
+    const failure = errors.length > 0 ? errors.join('\n\n') : `Playwright ended the run with status ${fullResult.status}`;
+    const mapped: Mapped = { result: 'error', failure: `Playwright reported an error outside any test: ${failure}` };
+    await this.finishStep(subject, mapped, 0, [], `${display}\nresult: error\n${mapped.failure}\n`);
   }
 
   // ---- small helpers ----
@@ -442,6 +483,7 @@ export default class TestStudioReporter implements Reporter {
 
   /** One plain line on the reporter's own error output, credentials removed. */
   private say(line: string): void {
+    this.lines++;
     process.stderr.write(`${ADAPTER_NAME}: ${this.redact(line)}\n`);
   }
 
