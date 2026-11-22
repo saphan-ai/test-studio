@@ -386,7 +386,8 @@ tool-delta --current <sarif> [--baseline <sarif>] [--waivers <.saphan-waivers.ya
 ```
 
 A result's identity is the first value of `partialFingerprints`, otherwise the first value of `fingerprints`,
-otherwise the derived fingerprint defined above. A result is new when that `(ruleId, identity)` pair is not in
+otherwise the derived fingerprint defined above; an empty or whitespace-only fingerprint value is ignored, so such
+a result falls back to the next source and, at last, to the derived fingerprint. A result is new when that `(ruleId, identity)` pair is not in
 the baseline. With no baseline, every result is new. Waivers apply to the new results only.
 
 The command prints one line per new result, `NEW <ruleId> <identity> <uri>:<startLine>`; one line per waived

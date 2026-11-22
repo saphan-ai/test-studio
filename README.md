@@ -5,7 +5,7 @@
 
 **Test Studio shows what your tests really proved, in the test framework you already use.**
 It is for any team whose code, and whose tests, now arrive faster than people can check them, often written by AI
-agents. You do not need to know anything about Saphan to read this page or to use what is in it.
+agents. You do not need to know anything about Saphan Studio to read this page or to use what is in it.
 
 ## The problem
 

@@ -588,3 +588,87 @@ func TestEmptyMessageDerivedIdentityIsStableAndWaivable(t *testing.T) {
 		t.Fatalf("a waived empty-message result was printed as NEW:\n%s", out)
 	}
 }
+
+// emptyFPResult is a SARIF result whose fingerprint properties are written by
+// the caller, so a test can put empty or blank values in them.
+func emptyFPResult(rule, message, uri string, line int, props string) string {
+	return fmt.Sprintf(`{"ruleId":%q,"message":{"text":%q},%s"locations":[{"physicalLocation":{"artifactLocation":{"uri":%q},"region":{"startLine":%d}}}]}`,
+		rule, message, props, uri, line)
+}
+
+func writeSARIF(t *testing.T, name string, results ...string) string {
+	t.Helper()
+	return writeTemp(t, name, `{"runs":[{"results":[`+strings.Join(results, ",")+`]}]}`)
+}
+
+func TestEmptyPartialFingerprintFallsBackToDerived(t *testing.T) {
+	t.Parallel()
+	for name, props := range map[string]string{
+		"empty":      `"partialFingerprints":{"k":""},`,
+		"whitespace": `"partialFingerprints":{"k":" \t "},`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := writeSARIF(t, "empty.sarif", emptyFPResult("RULE-EMPTY", "marker-empty", "notes/empty.txt", 2, props))
+			_, out := runDelta(t, "--current", path, "--today", "2026-11-04")
+			want := "NEW RULE-EMPTY " + specDerived("RULE-EMPTY", "notes/empty.txt", "marker-empty") + " notes/empty.txt:2"
+			got := linesWith(out, "NEW ")
+			if len(got) != 1 || got[0] != want {
+				t.Fatalf("NEW lines = %#v, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestEmptyFingerprintsDoNotShareOneIdentity(t *testing.T) {
+	t.Parallel()
+	props := `"partialFingerprints":{"k":""},"fingerprints":{"k":""},`
+	first := emptyFPResult("RULE-SHARED", "marker-one", "notes/one.txt", 1, props)
+	second := emptyFPResult("RULE-SHARED", "marker-two", "notes/two.txt", 9, props)
+	base := writeSARIF(t, "base.sarif", first)
+	current := writeSARIF(t, "current.sarif", first, second)
+	code, out := runDelta(t, "--current", current, "--baseline", base, "--today", "2026-11-04")
+	if code != exitNew {
+		t.Fatalf("exit %d, want %d\n%s", code, exitNew, out)
+	}
+	requireSummary(t, out, 1, 0, 0)
+	want := "NEW RULE-SHARED " + specDerived("RULE-SHARED", "notes/two.txt", "marker-two") + " notes/two.txt:9"
+	got := linesWith(out, "NEW ")
+	if len(got) != 1 || got[0] != want {
+		t.Fatalf("NEW lines = %#v, want %q", got, want)
+	}
+}
+
+func TestEmptyPartialFallsBackToFingerprintsValue(t *testing.T) {
+	t.Parallel()
+	props := `"partialFingerprints":{"a":"  ","b":""},"fingerprints":{"x":"","y":"from-fingerprints"},`
+	path := writeSARIF(t, "mixed.sarif", emptyFPResult("RULE-MIXED", "marker-mixed", "notes/mixed.txt", 5, props))
+	_, out := runDelta(t, "--current", path, "--today", "2026-11-04")
+	got := linesWith(out, "NEW ")
+	if len(got) != 1 || got[0] != "NEW RULE-MIXED from-fingerprints notes/mixed.txt:5" {
+		t.Fatalf("NEW lines = %#v", got)
+	}
+}
+
+func TestBlankWaiverDoesNotWaiveARealResultOfTheSameRule(t *testing.T) {
+	t.Parallel()
+	blank := `"partialFingerprints":{"a":" "},"fingerprints":{"x":"real"},`
+	path := writeSARIF(t, "blank.sarif", emptyFPResult("RULE-BLANK", "marker-blank", "notes/blank.txt", 3, blank))
+	waivers := writeTemp(t, "blank-waiver.yaml", "waivers:\n"+
+		"  - rule: RULE-BLANK\n"+
+		"    fingerprint: \" \"\n"+
+		"    reason: blank waiver\n"+
+		"    expires: 2027-03-31\n")
+	code, out := runDelta(t, "--current", path, "--waivers", waivers, "--today", "2026-11-04")
+	if code != exitNew {
+		t.Fatalf("exit %d, want %d\n%s", code, exitNew, out)
+	}
+	requireSummary(t, out, 1, 0, 0)
+	got := linesWith(out, "NEW ")
+	if len(got) != 1 || got[0] != "NEW RULE-BLANK real notes/blank.txt:3" {
+		t.Fatalf("NEW lines = %#v", got)
+	}
+	if waived := linesWith(out, "WAIVED "); len(waived) != 0 {
+		t.Fatalf("a blank waiver waived a real result: %#v", waived)
+	}
+}

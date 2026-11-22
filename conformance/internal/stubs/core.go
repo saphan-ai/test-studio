@@ -16,7 +16,7 @@ import (
 	"github.com/saphan-ai/test-studio/conformance/internal/schemas"
 )
 
-// Mode says whether the adapter runs on its own or inside a Saphan leg's run.
+// Mode says whether the adapter runs on its own or inside a Saphan Studio leg's run.
 type Mode string
 
 // The two modes (specification section "Opening or attaching").

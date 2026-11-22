@@ -65,7 +65,7 @@ output beside it. Name a terminal reporter such as `list` yourself if you want a
 |---|---|
 | `TESTS_CORE_URL` | base URL of the Test Studio core (required) |
 | `TESTS_RESULT_FILE` | file the run result is written to |
-| `MOCKS_RUN_ID`, `MOCKS_RUN_TOKEN` | inside a Saphan leg: attach to this run with this credential, never open a second one |
+| `MOCKS_RUN_ID`, `MOCKS_RUN_TOKEN` | inside a Saphan Studio leg: attach to this run with this credential, never open a second one |
 | `MOCKS_CORE_URL` | inside a leg: must name the same service as the core's answer, or the reporter refuses with `mocks-core-mismatch` |
 | `TESTS_RUN_TOKEN` | a test-run credential a parent process hands down; never put on a command line |
 

@@ -52,17 +52,19 @@ Noise on a typical repository: strings that look like keys but are test fixtures
 
 ## What its exit codes mean
 
-The record maps exit code 0 to `clean`, exit code 3 to `findings`, and anything else to `tool-error`. A crash of the scanner is therefore a broken run: it is reported as `tool-error`, never read as clean and never read as findings. `tool-error` means the record, the binary, or the scanned repository's own `.gitleaks.toml` — missing or malformed — is broken.
+Exit codes name the program they belong to:
+
+- gitleaks (the scanner): 0 means clean, 3 means findings, anything else — a crash, a bad flag, an unreadable `.gitleaks.toml` — is `tool-error`: a broken run of gitleaks, never read as clean and never read as findings.
+- `tool-delta` (the delta): 0 means no `NEW` line was printed (nothing new), 1 means at least one `NEW` line, and 2 means a usage or input error. Exit 2 means the delta did not run; it is never "nothing new" — report it as an input error, and never read the delta's output lines as clean.
 
 ## What to do with a delta
 
-A run whose exit code maps to `findings`:
+Act on the delta (`tool-delta`, "The delta" in `spec/TOOL_RECORD_V1.md`), not on the raw SARIF report:
 
-1. fix — a REAL secret is rotated first: revoke it at its issuer, and only then remove it from the files. Removing it from the files does not remove it from history, so the history question goes to a human.
-2. waive — a waiver is for a false positive or a test fixture only; it is never an equal choice to fixing a live secret. Add an entry to `.saphan-waivers.yaml` with `rule`, `fingerprint`, `reason` and an `expires` date (the spec's key); an expired waiver is reported and never silently applied.
-3. escalate — if the secret might be real, treat it as compromised: rotate it and tell the security contact; never log or commit the value.
-
-A run mapping to `clean` needs no action; `tool-error` means the record, the binary, or the scanned repository's own `.gitleaks.toml` — missing or malformed — is broken.
+- `NEW <ruleId> <identity> <uri>:<startLine>` — a finding to fix, waive or escalate. Fix: a REAL secret is rotated first — revoke it at its issuer, and only then remove it from the files; removing it from the files does not remove it from history, so the history question goes to a human. Waive: add an entry to `.saphan-waivers.yaml` whose `fingerprint` is the identity the delta printed on that `NEW` line — the `partialFingerprints`/`fingerprints` value, or the derived `saphan/v1:` fingerprint when the result has neither — with `rule`, `reason` and `expires`; a waiver is for a false positive or a test fixture only, never an equal choice to fixing a live secret; an expired waiver is reported and never silently applied. Escalate: if the secret might be real, treat it as compromised: rotate it and tell the security contact; never log or commit the value.
+- `WAIVED <ruleId> <identity> until <expires>` — nothing to do until its date.
+- `EXPIRED <rule> <fingerprint> <reason> expired <expires>` — the waiver lapsed: the finding counts again, so fix it or renew the waiver with a reason.
+- `tool-delta` exits 0 when no `NEW` line was printed (nothing new), 1 when at least one `NEW` line was printed, and 2 on a usage or input error; exit 2 means the delta did not run and is never "nothing new". A run mapping to `clean` needs no action; `tool-error` means the record, the binary, or the scanned repository's own `.gitleaks.toml` — missing or malformed — is broken.
 
 ## Repository policy files
 

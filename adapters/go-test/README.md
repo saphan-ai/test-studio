@@ -69,7 +69,7 @@ not serve); `3` the core could not be reached or would not open or close the run
 |---|---|
 | `TESTS_CORE_URL` | base URL of the Test Studio core (required) |
 | `TESTS_RESULT_FILE` | file the run result is written to |
-| `MOCKS_RUN_ID`, `MOCKS_RUN_TOKEN` | inside a Saphan leg: attach to this run with this credential |
+| `MOCKS_RUN_ID`, `MOCKS_RUN_TOKEN` | inside a Saphan Studio leg: attach to this run with this credential |
 
 The credential never reaches a command line, an event, a summary, the run result or the adapter's
 own output: the credentials of the environment (`MOCKS_RUN_TOKEN`, `TESTS_RUN_TOKEN`) are removed

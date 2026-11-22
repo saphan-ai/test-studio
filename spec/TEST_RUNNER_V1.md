@@ -25,7 +25,7 @@ A test framework discovers test items (a test function, a test case, a scenario)
 a run of them into a conversation with the core:
 
 1. ask which spec versions the core serves, and pick one it speaks;
-2. open a test run, or — inside a Saphan leg — **attach** to the leg's run;
+2. open a test run, or — inside a Saphan Studio leg — **attach** to the leg's run;
 3. for every test item, **start a step** (the core answers with a W3C `traceparent`), hand that
    `traceparent` to the test so the system under test carries it, then **finish the step** with
    one result;
@@ -289,7 +289,7 @@ Fields: `run_id`, `test_run_id`, `project`, `verdict` (`pass`, `fail`, `error`),
 
   The fourth row hashes the bytes `evt-0001\nevt-0002\nevt-0003\n`; the fifth, after sorting to
   `evt-B`, `evt-a-1`, `evt-a.1`, `evt-b`, hashes `evt-B\nevt-a-1\nevt-a.1\nevt-b\n`.
-- **`evidence_line`.** The line a Saphan leg cites in its return, verbatim:
+- **`evidence_line`.** The line a Saphan Studio leg cites in its return, verbatim:
   `- evidence: test-studio-run <run_id>/<test_run_id> verdict=<verdict> events=sha256:<hex>`.
   Whoever verifies it asks the Mock Studio core for the test run's event ids and recomputes the
   digest; a mismatch or an absent run is a refusal, never a pass.

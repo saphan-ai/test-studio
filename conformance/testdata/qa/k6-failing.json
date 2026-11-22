@@ -1,0 +1,7 @@
+{
+  "metrics": {
+    "http_req_duration": {"p(50)": 30, "p(95)": 100, "p(99)": 150},
+    "http_reqs": {"count": 3000, "rate": 100},
+    "http_req_failed": {"passes": 600, "fails": 2400, "value": 0.2}
+  }
+}

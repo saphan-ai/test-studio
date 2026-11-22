@@ -14,7 +14,7 @@ import (
 const SpecVersion = "v1"
 
 // Environment variables an adapter reads. The first group is what the conformance runner (and, in
-// production, the core or a Saphan leg) puts into the adapter's environment.
+// production, the core or a Saphan Studio leg) puts into the adapter's environment.
 const (
 	EnvCoreURL    = "TESTS_CORE_URL"            // base URL of the Test Studio core
 	EnvRunToken   = "TESTS_RUN_TOKEN"           // optional: a test-run credential handed on by a parent process
@@ -169,7 +169,7 @@ type RunResult struct {
 	EvidenceLine string   `json:"evidence_line"`
 }
 
-// EvidenceLine is the line a Saphan leg cites, verbatim from section 6 of the ecosystem contract.
+// EvidenceLine is the line a Saphan Studio leg cites, verbatim from section 6 of the ecosystem contract.
 func EvidenceLine(runID, testRunID, verdict, eventsDigest string) string {
 	return "- evidence: test-studio-run " + runID + "/" + testRunID + " verdict=" + verdict + " events=" + eventsDigest
 }

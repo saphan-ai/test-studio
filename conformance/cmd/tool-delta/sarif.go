@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // finding is one SARIF result reduced to the fields the delta may print.
@@ -132,14 +133,28 @@ func (r sarifResult) toFinding() (finding, error) {
 	if err != nil {
 		return finding{}, err
 	}
-	prints := append(append([]string{}, r.Partial...), r.Full...)
+	partial := nonBlank(r.Partial)
+	full := nonBlank(r.Full)
+	prints := append(append([]string{}, partial...), full...)
 	identity := derived
-	if len(r.Partial) > 0 {
-		identity = r.Partial[0]
-	} else if len(r.Full) > 0 {
-		identity = r.Full[0]
+	if len(partial) > 0 {
+		identity = partial[0]
+	} else if len(full) > 0 {
+		identity = full[0]
 	} else {
 		prints = []string{derived}
 	}
 	return finding{ruleID: r.RuleID, identity: identity, uri: uri, line: line, prints: prints}, nil
+}
+
+// nonBlank drops empty and whitespace-only values: a scanner that writes one
+// would otherwise give every result of a rule the same identity.
+func nonBlank(values []string) []string {
+	var out []string
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }

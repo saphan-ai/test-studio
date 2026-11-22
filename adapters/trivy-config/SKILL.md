@@ -23,15 +23,23 @@ The pinned invocation is `trivy config --config= --ignorefile= --cache-dir <fres
 
 ## What its output means
 
-The tool writes SARIF 2.1.0 to `report.sarif`. Each finding is a SARIF result: `ruleId` names the check (for example `DS-0002`, runs as root, or `DS-0026`, no HEALTHCHECK), `level` is the severity, `message` holds the description, and `locations` point at the configured file. Severity fields follow SARIF 2.1.0: `level` is one of `error`, `warning`, `note`, `none`.
+The tool writes SARIF 2.1.0 to `report.sarif`. Each finding is a SARIF result: `ruleId` names the check (for example `DS-0002`, runs as root, or `DS-0026`, no HEALTHCHECK), `level` is the severity, and `locations` point at the configured file. Severity fields follow SARIF 2.1.0: `level` is one of `error`, `warning`, `note`, `none`.
 
-The exit map is `{0: clean, 3: findings, default: tool-error}`: exit 0 means clean, 3 means findings, anything else — including the 2 a crashing Go program exits with and the 1 trivy returns on a bad flag or a missing path — maps to `tool-error`. No error uses the findings exit code.
+Exit codes name the program they belong to:
+
+- trivy (the scanner): 0 means clean, 3 means findings, anything else — a bad flag, a missing path, a crash (Go exits 2 on a crash) — is `tool-error`: a broken run of trivy, never findings. No error uses the findings exit code.
+- `tool-delta` (the delta): 0 means no `NEW` line was printed (nothing new), 1 means at least one `NEW` line, and 2 means a usage or input error. Exit 2 means the delta did not run; it is never "nothing new" — report it as an input error, and never read the delta's output lines as clean.
 
 ## What to do with a delta
 
-- Fix: remove the misconfiguration from the configuration file.
-- Waive: trivy writes no fingerprint into its SARIF report, so its findings cannot be waived through `.saphan-waivers.yaml` today — the waiver file requires all four fields, `fingerprint` included, and a waiver applies only to a finding one of whose fingerprints equals `fingerprint`. Until the runner derives a fingerprint for tools that write none, a trivy finding is fixed or escalated, never waived. Do not invent a fingerprint, and do not use the scanned repository's own `trivy.yaml` or `.trivyignore`, which the record switches off.
-- Escalate: a finding on a configuration you did not expect to change, a result you cannot reproduce, output that does not parse as SARIF 2.1.0, or a finding that is a true false positive — raise it before merging. A true false positive goes to a human, because it cannot be waived yet.
+Act on the delta (`tool-delta`, "The delta" in `spec/TOOL_RECORD_V1.md`), not on the raw SARIF report:
+
+- `NEW <ruleId> <identity> <uri>:<startLine>` — a finding to fix, waive (where this skill allows it) or escalate. Fix: remove the misconfiguration from the configuration file. Waive: add an entry to `.saphan-waivers.yaml` whose `fingerprint` is the identity the delta printed on that `NEW` line — the result's `partialFingerprints` or `fingerprints` value, or the derived fingerprint when the result has neither — with `rule`, `reason` and an `expires` date. A waiver is legitimate only for a false positive or for a configuration that is deliberate and reviewed; it is never a way to accept a real misconfiguration without fixing it. Waivers expire, and an expired waiver is reported and never silently applied. Escalate: a finding on a configuration you did not expect to change, a result you cannot reproduce, or output that does not parse as SARIF 2.1.0 — raise it before merging.
+- `WAIVED <ruleId> <identity> until <expires>` — the finding is covered by an unexpired waiver; nothing to do until its date.
+- `EXPIRED <rule> <fingerprint> <reason> expired <expires>` — the waiver lapsed: the finding counts again, so fix it or renew the waiver with a reason.
+- `tool-delta` exits 0 when no `NEW` line was printed (nothing new), 1 when at least one `NEW` line was printed, and 2 on a usage or input error; exit 2 means the delta did not run and is never "nothing new".
+
+Do not use the scanned repository's own `trivy.yaml` or `.trivyignore`: the record switches them off with `--config=` and `--ignorefile=` (empty values). Never print, quote or ask for a finding's message.
 
 Noise on a typical repository: rules for files that do not exist there — for example Kubernetes checks when there are no Kubernetes manifests — simply never fire; they are quiet, not a clean result. On `dockerfile-misconfigured` trivy reports the root user (`DS-0002`) and the missing HEALTHCHECK (`DS-0026`); it does not report the remote-URL `ADD`, although the fixture's README claims every scanner flags it. That gap is a measurement, not a defect of this record; do not edit the fixture to force a missing rule, report the gap instead.
 

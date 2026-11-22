@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qa-result/v1",
+  "title": "QA test result, version 1",
+  "description": "One normalized result for a load or fault test run, judged against named budgets (spec/QA_RESULT_V1.md). additionalProperties is refused everywhere; fault is required when kind is fault and absent when kind is load.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "tool", "kind", "load", "budgets", "verdict"],
+  "properties": {
+    "schema": { "const": "qa-result/v1" },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "kind": { "type": "string", "enum": ["load", "fault"] },
+    "load": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "throughput_rps", "error_rate", "latency_ms", "open_model"],
+      "properties": {
+        "requests": { "type": "integer", "minimum": 0 },
+        "throughput_rps": { "type": "number", "minimum": 0 },
+        "error_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "latency_ms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["p50", "p95", "p99"],
+          "properties": {
+            "p50": { "type": "number", "minimum": 0 },
+            "p95": { "type": "number", "minimum": 0 },
+            "p99": { "type": "number", "minimum": 0 }
+          }
+        },
+        "open_model": { "type": "boolean" }
+      }
+    },
+    "fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["injected", "steady_state", "pass"],
+      "properties": {
+        "injected": { "type": "string", "minLength": 1 },
+        "steady_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["budgets_held"],
+          "properties": {
+            "budgets_held": { "type": "boolean" }
+          }
+        },
+        "pass": { "type": "boolean" }
+      }
+    },
+    "processes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "cpu_seconds", "max_rss_bytes"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "cpu_seconds": { "type": "number", "minimum": 0 },
+          "max_rss_bytes": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "budgets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "limit", "actual", "breached"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "limit": { "type": "number" },
+          "actual": { "type": "number" },
+          "breached": { "type": "boolean" }
+        }
+      }
+    },
+    "verdict": { "type": "string", "enum": ["pass", "breach"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "fault" } }, "required": ["kind"] },
+      "then": { "required": ["fault"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "load" } }, "required": ["kind"] },
+      "then": { "properties": { "fault": { "not": {} } } }
+    }
+  ]
+}
